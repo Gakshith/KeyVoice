@@ -19,7 +19,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let coordinator = Coordinator(
             hotkey: HotkeyMonitor(config: config),
             audio: MicAudioCapture(config: config),
-            transcriber: SpeechTranscriberEngine(),   // WhisperKitEngine() is the fallback
+            transcriber: FallbackTranscriber(
+                primary: SpeechTranscriberEngine(),    // Apple on-device, macOS 26
+                fallback: WhisperKitEngine()           // used if SpeechAnalyzer/assets unavailable
+            ),
             cleaner: ClaudeCleaner(config: config),
             inserter: PasteInserter(config: config),
             targets: AXTargetProvider(),
