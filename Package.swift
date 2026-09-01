@@ -31,7 +31,8 @@ let package = Package(
 
         // Pure-logic unit tests (no hardware needed) so the core is verifiable in CI.
         .testTarget(name: "KeyVoiceCoreTests", dependencies: ["KeyVoiceCore"]),
-        .testTarget(name: "KeyVoiceHUDTests", dependencies: ["KeyVoiceHUD"])
+        .testTarget(name: "KeyVoiceHUDTests", dependencies: ["KeyVoiceHUD"]),
+        .testTarget(name: "KeyVoiceAudioTests", dependencies: ["KeyVoiceAudio"])
     ],
     // Language mode 5: this is a UI/system app full of CoreFoundation types that aren't Sendable.
     // Strict 6-mode concurrency here buys warnings, not safety. @MainActor is used where it matters.
