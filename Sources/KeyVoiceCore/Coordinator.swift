@@ -1,4 +1,5 @@
 import Foundation
+import AVFAudio
 
 /// The pipeline spine. Owns one dictation run at a time and drives:
 ///
@@ -18,6 +19,10 @@ public final class Coordinator {
 
     /// Menu-bar status sink. Set by the app shell.
     public var onStatus: ((PipelineStatus) -> Void)?
+
+    /// Optional passive tap on the live microphone buffers, called alongside the transcriber (never
+    /// a second capture). The app shell points this at the audio level meter that drives the HUD.
+    public var audioMonitor: ((AVAudioPCMBuffer) -> Void)?
 
     private var lockedTarget: Target?
     private var isRecording = false
@@ -46,7 +51,10 @@ public final class Coordinator {
             // The tap callback runs on its run loop; hop to the main actor before touching state.
             Task { @MainActor in self?.handle(event) }
         }
-        audio.onBuffer = { [weak self] buffer in self?.transcriber.feed(buffer) }
+        audio.onBuffer = { [weak self] buffer in
+            self?.audioMonitor?(buffer)          // level meter for the HUD (passive)
+            self?.transcriber.feed(buffer)
+        }
         audio.onAutoCommit = { [weak self] in self?.handle(.commit(holdDuration: self?.config.maxRecording ?? 0)) }
         try hotkey.start()
         emit(.idle)
