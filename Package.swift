@@ -19,17 +19,19 @@ let package = Package(
         .target(name: "KeyVoiceInsert", dependencies: ["KeyVoiceCore"]),   // branch: paste
         .target(name: "KeyVoiceAudio",  dependencies: ["KeyVoiceCore"]),   // branch: speech
         .target(name: "KeyVoiceCleanup", dependencies: ["KeyVoiceCore"]),  // branch: cleanup
+        .target(name: "KeyVoiceHUD",     dependencies: ["KeyVoiceCore"]),  // branch: hud — floating Aurora HUD
 
         // The app shell wires the concrete implementations into the Coordinator.
         .executableTarget(
             name: "KeyVoiceApp",
             dependencies: [
-                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup"
+                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup", "KeyVoiceHUD"
             ]
         ),
 
         // Pure-logic unit tests (no hardware needed) so the core is verifiable in CI.
-        .testTarget(name: "KeyVoiceCoreTests", dependencies: ["KeyVoiceCore"])
+        .testTarget(name: "KeyVoiceCoreTests", dependencies: ["KeyVoiceCore"]),
+        .testTarget(name: "KeyVoiceHUDTests", dependencies: ["KeyVoiceHUD"])
     ],
     // Language mode 5: this is a UI/system app full of CoreFoundation types that aren't Sendable.
     // Strict 6-mode concurrency here buys warnings, not safety. @MainActor is used where it matters.

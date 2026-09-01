@@ -12,8 +12,8 @@ import Speech
 /// `feed` pushes live microphone buffers into it during the hold, and `finishSession` finalizes and
 /// returns the accumulated transcript — so on key-up the text is essentially already there.
 ///
-/// On macOS < 26, or when the transcriber / its assets are unavailable, `beginSession` throws so the
-/// Coordinator falls back to `WhisperKitEngine`.
+/// On macOS < 26, or when the transcriber / its assets are unavailable, `beginSession` throws and the
+/// error surfaces to the menu bar + HUD (Apple-only; there is no secondary engine).
 public final class SpeechTranscriberEngine: Transcriber {
 
     /// Locale we transcribe in. `en-US`; normalized to the framework's supported equivalent at setup.

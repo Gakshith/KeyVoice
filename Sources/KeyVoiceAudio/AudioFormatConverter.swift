@@ -1,62 +1,8 @@
 import Foundation
 import AVFoundation
-import KeyVoiceCore
 
-/// Fallback transcription via WhisperKit (`small.en`).
-///
-/// Accumulates the held audio as 16 kHz mono Float samples (WhisperKit's expected input) and
-/// transcribes on finish. Everything around the model call is implemented; the call itself is a
-/// one-line wiring change once the SPM dependency is added (see the TODO in `finishSession`).
-public final class WhisperKitEngine: Transcriber {
-
-    /// WhisperKit consumes 16 kHz mono Float32 PCM.
-    private let targetFormat = AVAudioFormat(
-        commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false
-    )!
-
-    private var converter: AudioFormatConverter?
-    /// Accumulated 16 kHz mono samples for the current hold.
-    private var samples: [Float] = []
-
-    public init() {}
-
-    public func beginSession() throws {
-        samples.removeAll(keepingCapacity: true)
-        converter = AudioFormatConverter(to: targetFormat)
-    }
-
-    public func feed(_ buffer: AVAudioPCMBuffer) {
-        guard let converter else { return }
-        let source: AVAudioPCMBuffer
-        if buffer.format == targetFormat {
-            source = buffer
-        } else if let converted = converter.convert(buffer) {
-            source = converted
-        } else {
-            return
-        }
-        guard let channel = source.floatChannelData?[0] else { return }
-        samples.append(contentsOf: UnsafeBufferPointer(start: channel, count: Int(source.frameLength)))
-    }
-
-    public func finishSession() async throws -> String {
-        let audio = samples
-        samples.removeAll(keepingCapacity: false)
-        guard !audio.isEmpty else { return "" }
-        // TODO(lead): add WhisperKit SPM dep and run small.en on `audio` (16 kHz mono Float).
-        // e.g. `let result = try await whisperKit.transcribe(audioArray: audio); return result.text`
-        // Everything up to here (accumulation + resampling to 16 kHz mono) is done — this is the
-        // only line to change. Returning "" until then keeps the pipeline honest (no fake output).
-        return ""
-    }
-
-    public func cancelSession() {
-        samples.removeAll(keepingCapacity: false)
-        converter = nil
-    }
-}
-
-// MARK: - Shared audio helpers (module-internal; also used by SpeechTranscriberEngine)
+// Shared audio helpers for the KeyVoiceAudio module. (Previously lived alongside the WhisperKit
+// engine; extracted here when that engine was removed, since SpeechTranscriberEngine relies on them.)
 
 /// Resamples/reformats PCM buffers into a fixed target format, reusing one `AVAudioConverter`.
 /// Rebuilds the underlying converter if the source format changes mid-stream.
