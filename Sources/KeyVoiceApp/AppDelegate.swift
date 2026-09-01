@@ -46,6 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try coordinator.start()
         } catch {
+            Log.error("startup failed: \(error.localizedDescription)")
             status.update(.error(error.localizedDescription))
         }
         self.coordinator = coordinator

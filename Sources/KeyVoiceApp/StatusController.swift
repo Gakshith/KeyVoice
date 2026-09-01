@@ -40,6 +40,7 @@ final class StatusController {
     func update(_ status: PipelineStatus) {
         // Any state change cancels a pending revert to "mic".
         revertToken &+= 1
+        item.button?.toolTip = nil
 
         switch status {
         case .idle:
@@ -51,9 +52,12 @@ final class StatusController {
         case .inserted, .insertedRaw:
             setSymbol("checkmark.circle")
             scheduleRevert(after: 1.0)
-        case .skippedNoSpeech, .abortedTargetLost, .error:
+        case .skippedNoSpeech, .abortedTargetLost:
             setSymbol("exclamationmark.circle")
             scheduleRevert(after: 1.2)
+        case .error(let message):
+            setSymbol("exclamationmark.circle")
+            item.button?.toolTip = message
         }
     }
 
@@ -98,7 +102,23 @@ final class StatusController {
         guard alert.runModal() == .alertFirstButtonReturn else { return }
 
         let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        try? Keychain.save(trimmed)
+        guard !trimmed.isEmpty else {
+            let emptyAlert = NSAlert()
+            emptyAlert.messageText = "No key entered"
+            emptyAlert.informativeText = "Nothing was saved."
+            emptyAlert.runModal()
+            return
+        }
+
+        do {
+            try Keychain.save(trimmed)
+        } catch {
+            Log.error("Failed to save API key: \(error)")
+
+            let errorAlert = NSAlert()
+            errorAlert.messageText = "Couldn’t save the key"
+            errorAlert.informativeText = error.localizedDescription
+            errorAlert.runModal()
+        }
     }
 }
