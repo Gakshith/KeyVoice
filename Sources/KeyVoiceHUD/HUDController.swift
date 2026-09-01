@@ -10,9 +10,8 @@ import KeyVoiceCore
 /// `update(_:)` owns the panel's lifecycle (show/hide), so the HUD can never be orphaned on screen
 /// and the app wiring stays a one-line status sink.
 ///
-/// The panel is a focus-safe `HUDPanel` (never key/main, click-through) hosting a SwiftUI view that
-/// observes `viewModel`. The SwiftUI content here is a deliberate PLACEHOLDER — a small translucent
-/// capsule — standing in for the real "Aurora" ribbon that lands on a later branch.
+/// The panel is a focus-safe `HUDPanel` (never key/main, click-through) hosting the `AuroraView`,
+/// which observes `viewModel` and draws the flowing ribbon reacting to the live voice level.
 @MainActor
 public final class HUDController {
     /// The bindable state the SwiftUI view observes.
@@ -20,7 +19,7 @@ public final class HUDController {
 
     private let config: AppConfig
 
-    /// Panel geometry, in points. Small on purpose — this is a stand-in.
+    /// Panel geometry, in points. Small and unobtrusive at the bottom of the screen.
     private static let panelSize = NSSize(width: 240, height: 84)
     /// How long a terminal state (`done` / `deflate`) stays on screen before ordering out.
     private static let lingerSeconds: TimeInterval = 0.45
@@ -94,6 +93,8 @@ public final class HUDController {
             guard let self else { return }
             self.pendingHide = nil
             self.hide()
+            // Settle to hidden so the Aurora TimelineView pauses (no rendering on an ordered-out panel).
+            self.viewModel.phase = .hidden
         }
         pendingHide = work
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
@@ -103,7 +104,7 @@ public final class HUDController {
         if let panel { return panel }
         let rect = NSRect(origin: .zero, size: Self.panelSize)
         let panel = HUDPanel(contentRect: rect)
-        let host = NSHostingView(rootView: HUDCapsuleView(model: viewModel))
+        let host = NSHostingView(rootView: AuroraView(model: viewModel))
         host.frame = rect
         // Let the material show through the hosting view / panel.
         if #available(macOS 13.0, *) {
@@ -134,130 +135,5 @@ public final class HUDController {
         let x = frame.midX - size.width / 2
         let y = frame.minY + 24
         panel.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
-    }
-}
-
-// MARK: - Placeholder content
-
-/// Small, monochrome, translucent stand-in for the Aurora ribbon. Reacts minimally to phase/level.
-/// Deliberately contains NO focusable controls (no TextField/Button), so nothing here can ever
-/// become first responder and break the panel's focus-safety.
-private struct HUDCapsuleView: View {
-    @State var model: HUDViewModel
-
-    private var isDeflate: Bool { model.phase == .deflate }
-
-    var body: some View {
-        ZStack {
-            content
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 20)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(
-            Capsule().strokeBorder(
-                (isDeflate ? Color.orange : Color.primary).opacity(0.18),
-                lineWidth: 1
-            )
-        )
-        .padding(14)
-        .animation(.easeInOut(duration: 0.2), value: model.phase)
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch model.phase {
-        case .listening:
-            LevelBars(level: model.level)
-        case .thinking:
-            ThinkingDots()
-        case .deflate:
-            DeflateLine()
-        case .done:
-            DonePulse()
-        case .appear, .hidden:
-            LevelBars(level: 0)
-        }
-    }
-}
-
-/// A short row of bars. The center bars scale with the live voice level while `.listening`.
-private struct LevelBars: View {
-    var level: Float
-
-    private let count = 5
-
-    var body: some View {
-        HStack(spacing: 5) {
-            ForEach(0..<count, id: \.self) { i in
-                Capsule()
-                    .fill(Color.primary.opacity(0.85))
-                    .frame(width: 5, height: barHeight(i))
-            }
-        }
-        .frame(height: 40)
-        .animation(.spring(response: 0.18, dampingFraction: 0.6), value: level)
-    }
-
-    /// Bell-shaped weighting so the middle bars react most, edges least.
-    private func barHeight(_ i: Int) -> CGFloat {
-        let mid = Double(count - 1) / 2
-        let weight = 1 - abs(Double(i) - mid) / (mid + 1)   // 1 at center → ~0.33 at edges
-        let base = 8.0
-        let span = 30.0 * weight
-        return base + span * CGFloat(max(0, min(1, level)))
-    }
-}
-
-/// A calm three-dot swirl for the transcribe + cleanup wait.
-private struct ThinkingDots: View {
-    @State private var phase = 0.0
-
-    var body: some View {
-        HStack(spacing: 7) {
-            ForEach(0..<3, id: \.self) { i in
-                Circle()
-                    .fill(Color.primary.opacity(0.85))
-                    .frame(width: 8, height: 8)
-                    .scaleEffect(0.6 + 0.4 * pulse(i))
-                    .opacity(0.5 + 0.5 * pulse(i))
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
-                phase = 1
-            }
-        }
-    }
-
-    private func pulse(_ i: Int) -> Double {
-        // Stagger the three dots so they breathe out of phase.
-        let shifted = phase + Double(i) * 0.33
-        return (sin(shifted * .pi * 2) + 1) / 2
-    }
-}
-
-/// Deflate to a single amber line — nothing heard, target lost, or an error.
-private struct DeflateLine: View {
-    var body: some View {
-        Capsule()
-            .fill(Color.orange.opacity(0.9))
-            .frame(width: 44, height: 5)
-    }
-}
-
-/// One confident pulse when text lands.
-private struct DonePulse: View {
-    @State private var on = false
-
-    var body: some View {
-        Circle()
-            .fill(Color.primary.opacity(0.9))
-            .frame(width: 14, height: 14)
-            .scaleEffect(on ? 1.25 : 0.85)
-            .opacity(on ? 1 : 0.6)
-            .onAppear {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.5)) { on = true }
-            }
     }
 }
