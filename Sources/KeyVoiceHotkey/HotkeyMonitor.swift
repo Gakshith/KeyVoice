@@ -79,6 +79,7 @@ public final class HotkeyMonitor: HotkeyMonitoring {
 
         eventTap = tap
         runLoopSource = source
+        Log.info("hotkey armed: listening for Right-Option (keyCode \(config.rightOptionKeyCode))")
     }
 
     public func stop() {
@@ -155,6 +156,7 @@ public final class HotkeyMonitor: HotkeyMonitoring {
         didBegin = false
         poisoned = false
         downTimestamp = CFAbsoluteTimeGetCurrent()
+        Log.info("Right-Option DOWN")
 
         // Debounce: only after minHold, and only if still cleanly held, do we spin up the mic.
         let work = DispatchWorkItem { [weak self] in
@@ -170,6 +172,7 @@ public final class HotkeyMonitor: HotkeyMonitoring {
     private func rightOptionReleased() {
         guard isRightOptionDown else { return }
         isRightOptionDown = false
+        Log.info("Right-Option UP (began=\(didBegin), poisoned=\(poisoned))")
 
         pendingBegin?.cancel()
         pendingBegin = nil

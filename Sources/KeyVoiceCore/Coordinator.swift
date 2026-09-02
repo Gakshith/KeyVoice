@@ -58,6 +58,7 @@ public final class Coordinator {
         audio.onAutoCommit = { [weak self] in self?.handle(.commit(holdDuration: self?.config.maxRecording ?? 0)) }
         try hotkey.start()
         emit(.idle)
+        Log.info("coordinator armed and ready")
     }
 
     // MARK: - Hotkey handling
