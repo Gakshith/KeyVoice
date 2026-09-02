@@ -16,6 +16,8 @@ struct AuroraView: View {
 
     /// When the current phase started, for one-shot animations (done pulse, deflate).
     @State private var phaseStart = Date()
+    /// Drives the spring-up when a dictation starts and the settle-down when it ends.
+    @State private var visible = false
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: model.phase == .hidden)) { timeline in
@@ -25,8 +27,9 @@ struct AuroraView: View {
                 let elapsed = now.timeIntervalSince(phaseStart)
                 switch model.phase {
                 case .listening, .appear:
-                    drawRibbons(ctx, size, t: t, level: Double(model.level))
-                    drawRim(ctx, size, level: Double(model.level))
+                    let lvl = pow(Double(model.level), 0.7)   // lift low/mid voice into the visible range
+                    drawRibbons(ctx, size, t: t, level: lvl)
+                    drawRim(ctx, size, level: lvl)
                 case .thinking:
                     drawThinking(ctx, size, t: t)
                 case .done:
@@ -41,7 +44,17 @@ struct AuroraView: View {
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
         .padding(14)
-        .onChange(of: model.phase) { phaseStart = Date() }
+        .scaleEffect(visible ? 1 : 0.9)
+        .offset(y: visible ? 0 : 12)
+        .opacity(visible ? 1 : 0)
+        .onAppear { visible = model.phase != .hidden }
+        .onChange(of: model.phase) { _, newPhase in
+            phaseStart = Date()
+            // Spring the capsule up when a dictation starts; settle it down when it ends.
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.7)) {
+                visible = (newPhase != .hidden)
+            }
+        }
     }
 
     // MARK: - Listening: three flowing ribbons
