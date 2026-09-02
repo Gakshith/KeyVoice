@@ -64,6 +64,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coordinator.onStatus = { [weak status, weak hud, weak settings] s in
             status?.update(s)
             hud?.update((settings?.showHUD ?? true) ? s : .idle)
+            if (s == .inserted || s == .insertedRaw), settings?.soundEnabled == true {
+                NSSound(named: "Tink")?.play()   // subtle confirmation when text lands
+            }
         }
         // Live mic level → meter → HUD (passive tap alongside the transcriber).
         coordinator.audioMonitor = { [weak levelMeter] buffer in levelMeter?.process(buffer) }
