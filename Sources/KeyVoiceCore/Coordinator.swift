@@ -27,6 +27,10 @@ public final class Coordinator {
     /// Called after text is successfully inserted, so the app shell can record it to history.
     public var onCompleted: ((DictationResult) -> Void)?
 
+    /// Optional final transform applied to the text just before insertion — the app shell points
+    /// this at the user's dictionary replacements.
+    public var transform: ((String) -> String)?
+
     /// Hold duration of the current dictation, captured at commit, used for words-per-minute.
     private var lastHoldDuration: TimeInterval = 0
 
@@ -145,7 +149,8 @@ public final class Coordinator {
             } ?? nil
 
             if Task.isCancelled { return }
-            let finalText = cleaned ?? trimmed
+            var finalText = cleaned ?? trimmed
+            if let transform { finalText = transform(finalText) }   // e.g. dictionary replacements
 
             // Re-verify the caret is still where we started — refuse to paste into a stranger.
             guard targets.stillValid(target) else {

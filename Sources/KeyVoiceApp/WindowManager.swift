@@ -13,14 +13,16 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private let store: Store
     private let settings: SettingsStore
     private let onSetAPIKey: () -> Void
+    private let onRearm: () -> Void
 
     private var hubWindow: NSWindow?
     private var onboardingWindow: NSWindow?
 
-    init(store: Store, settings: SettingsStore, onSetAPIKey: @escaping () -> Void) {
+    init(store: Store, settings: SettingsStore, onSetAPIKey: @escaping () -> Void, onRearm: @escaping () -> Void) {
         self.store = store
         self.settings = settings
         self.onSetAPIKey = onSetAPIKey
+        self.onRearm = onRearm
     }
 
     func showHub() {
@@ -40,6 +42,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
                 content: OnboardingView(settings: settings) { [weak self] in
                     self?.settings.needsOnboarding = false
                     self?.onboardingWindow?.close()
+                    self?.onRearm()   // permissions likely just granted — arm the hotkey without a restart
                 },
                 styleMask: [.titled, .closable]
             )

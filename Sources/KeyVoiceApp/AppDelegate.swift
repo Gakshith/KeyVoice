@@ -24,15 +24,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // menu — its key equivalents work even though the menu bar itself isn't shown.
         installEditMenu()
 
-        let config = AppConfig()
-
         let store = Store()
         let settings = SettingsStore()
         self.store = store
         self.settings = settings
 
-        let windowManager = WindowManager(store: store, settings: settings,
-                                          onSetAPIKey: { [weak self] in self?.status?.promptForAPIKey() })
+        // Seed runtime config from the user's saved settings.
+        var config = AppConfig()
+        config.rightOptionKeyCode = Int64(settings.hotKeyCode)
+
+        let windowManager = WindowManager(
+            store: store, settings: settings,
+            onSetAPIKey: { [weak self] in self?.status?.promptForAPIKey() },
+            onRearm: { [weak self] in self?.rearm() }
+        )
         self.windowManager = windowManager
 
         let status = StatusController(
@@ -55,29 +60,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             config: config
         )
 
-        // Status fans out to both the menu bar and the on-screen HUD.
-        coordinator.onStatus = { [weak status, weak hud] s in
+        // Status fans out to the menu bar always, and to the HUD only if the user keeps it on.
+        coordinator.onStatus = { [weak status, weak hud, weak settings] s in
             status?.update(s)
-            hud?.update(s)
+            hud?.update((settings?.showHUD ?? true) ? s : .idle)
         }
         // Live mic level → meter → HUD (passive tap alongside the transcriber).
         coordinator.audioMonitor = { [weak levelMeter] buffer in levelMeter?.process(buffer) }
         levelMeter.onLevel = { [weak hud] level in hud?.setLevel(level) }
         // Completed dictations go to local history.
         coordinator.onCompleted = { [weak store] result in store?.record(result) }
+        // Apply the user's dictionary replacements to the final text.
+        coordinator.transform = { [weak store] text in store?.applyReplacements(to: text) ?? text }
 
-        do {
-            try coordinator.start()
-        } catch {
-            Log.error("startup failed: \(error.localizedDescription)")
-            status.update(.error(error.localizedDescription))
-        }
         self.coordinator = coordinator
+        rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)
 
         // First run: walk the user through permissions.
         if settings.needsOnboarding {
             windowManager.showOnboarding()
         }
+    }
+
+    /// (Re)start the pipeline. Idempotent — the hotkey tap only creates once. Called at launch, when
+    /// onboarding finishes, and whenever the app reactivates, so granting Input Monitoring takes
+    /// effect without a manual restart.
+    func rearm() {
+        guard let coordinator else { return }
+        do {
+            try coordinator.start()
+        } catch {
+            Log.error("arm failed: \(error.localizedDescription)")
+            status?.update(.error(error.localizedDescription))
+        }
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        rearm()
     }
 
     /// Installs a minimal main menu with a standard Edit menu so the system editing shortcuts
