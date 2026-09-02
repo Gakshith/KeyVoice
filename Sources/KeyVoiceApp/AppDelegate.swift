@@ -15,6 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var levelMeter: AudioLevelMeter?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // A menu-bar (.accessory) app has no main menu, so ⌘X/⌘C/⌘V/⌘A have nothing to route
+        // through and paste fails in our text fields (e.g. Set API Key). Install a standard Edit
+        // menu — its key equivalents work even though the menu bar itself isn't shown.
+        installEditMenu()
+
         let config = AppConfig()
 
         let status = StatusController()
@@ -50,5 +55,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             status.update(.error(error.localizedDescription))
         }
         self.coordinator = coordinator
+    }
+
+    /// Installs a minimal main menu with a standard Edit menu so the system editing shortcuts
+    /// (Cut/Copy/Paste/Select All) reach the first responder's field editor. Without this, an
+    /// accessory app's text fields accept typing but not ⌘V. Targets are nil → responder chain.
+    private func installEditMenu() {
+        let mainMenu = NSMenu()
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        editItem.submenu = editMenu
+
+        NSApp.mainMenu = mainMenu
     }
 }
