@@ -65,6 +65,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)   // show the aurora backdrop through the form
         .padding()
         .navigationTitle("Settings")
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import KeyVoiceDesign
 import KeyVoiceStore
 
 /// The Hub window: a sidebar (Home / Dictionary / Settings) with a detail pane. This shell is the
@@ -21,13 +22,20 @@ public struct HubView: View {
             List(HubSection.allCases, id: \.self, selection: $section) { s in
                 Label(s.title, systemImage: s.icon).tag(Optional(s))
             }
+            .scrollContentBackground(.hidden)            // let the aurora show through the sidebar
+            .background { GlassBackdrop() }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
             .navigationTitle("KeyVoice")
         } detail: {
-            switch section ?? .home {
-            case .home:       HomeView(store: store)
-            case .dictionary: DictionaryView(store: store)
-            case .settings:   SettingsView(store: store, settings: settings, onSetAPIKey: onSetAPIKey)
+            ZStack {
+                GlassBackdrop()                          // the luminous surface every glass panel refracts
+                Group {
+                    switch section ?? .home {
+                    case .home:       HomeView(store: store)
+                    case .dictionary: DictionaryView(store: store)
+                    case .settings:   SettingsView(store: store, settings: settings, onSetAPIKey: onSetAPIKey)
+                    }
+                }
             }
         }
         .frame(minWidth: 760, minHeight: 500)

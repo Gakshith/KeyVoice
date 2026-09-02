@@ -29,7 +29,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if hubWindow == nil {
             hubWindow = makeWindow(
                 title: "KeyVoice",
-                content: HubView(store: store, settings: settings, onSetAPIKey: onSetAPIKey)
+                content: HubView(store: store, settings: settings, onSetAPIKey: onSetAPIKey),
+                fullBleed: true
             )
         }
         present(hubWindow)
@@ -55,14 +56,25 @@ final class WindowManager: NSObject, NSWindowDelegate {
     private func makeWindow(
         title: String,
         content: some View,
-        styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
+        styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable],
+        fullBleed: Bool = false
     ) -> NSWindow {
+        // A full-bleed window lets the aurora backdrop run edge-to-edge under a transparent titlebar,
+        // so the glass Hub reads as one continuous luminous surface instead of a framed dark box.
+        let mask = fullBleed ? styleMask.union(.fullSizeContentView) : styleMask
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 820, height: 560),
-            styleMask: styleMask, backing: .buffered, defer: false
+            styleMask: mask, backing: .buffered, defer: false
         )
         window.title = title
-        window.titlebarAppearsTransparent = false
+        if fullBleed {
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.isMovableByWindowBackground = true
+            window.backgroundColor = .clear
+        } else {
+            window.titlebarAppearsTransparent = false
+        }
         window.isReleasedWhenClosed = false          // we keep the reference; reuse on reopen
         window.contentView = NSHostingView(rootView: content)
         window.center()
