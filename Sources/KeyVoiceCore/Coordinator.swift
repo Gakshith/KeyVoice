@@ -24,6 +24,12 @@ public final class Coordinator {
     /// a second capture). The app shell points this at the audio level meter that drives the HUD.
     public var audioMonitor: ((AVAudioPCMBuffer) -> Void)?
 
+    /// Called after text is successfully inserted, so the app shell can record it to history.
+    public var onCompleted: ((DictationResult) -> Void)?
+
+    /// Hold duration of the current dictation, captured at commit, used for words-per-minute.
+    private var lastHoldDuration: TimeInterval = 0
+
     private var lockedTarget: Target?
     private var isRecording = false
     private var runTask: Task<Void, Never>?
@@ -111,6 +117,7 @@ public final class Coordinator {
         audio.stop()
         guard let target = lockedTarget else { emit(.idle); return }
 
+        lastHoldDuration = held
         emit(.thinking)
         runTask = Task { [weak self] in
             await self?.finishPipeline(target: target)
@@ -149,6 +156,7 @@ public final class Coordinator {
 
             try inserter.insert(finalText, into: target)
             emit(cleaned == nil ? .insertedRaw : .inserted)
+            onCompleted?(DictationResult(text: finalText, app: target.appContext, duration: lastHoldDuration))
             Log.info("pasted \(finalText.count) chars (\(cleaned == nil ? "raw" : "cleaned"))")
         } catch {
             surface(error)
