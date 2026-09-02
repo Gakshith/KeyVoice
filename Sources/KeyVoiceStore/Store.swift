@@ -55,6 +55,14 @@ public final class Store {
         try? context.save()
     }
 
+    public func clearHistory() {
+        let records = (try? context.fetch(FetchDescriptor<TranscriptRecord>())) ?? []
+        for record in records {
+            context.delete(record)
+        }
+        try? context.save()
+    }
+
     /// Aggregate stats for the Home card: total words, current day-streak, average WPM.
     public func stats() -> (words: Int, streak: Int, avgWPM: Int) {
         let all = transcripts()
