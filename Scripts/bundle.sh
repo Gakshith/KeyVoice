@@ -20,6 +20,8 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/KeyVoice"
 cp Packaging/Info.plist "$APP/Contents/Info.plist"
+mkdir -p "$APP/Contents/Resources"
+cp Packaging/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # --- Code signing -----------------------------------------------------------------------------
 # macOS ties TCC permissions (Input Monitoring, Accessibility) to the app's code-signing identity.
