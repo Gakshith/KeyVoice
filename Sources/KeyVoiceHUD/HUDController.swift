@@ -20,7 +20,7 @@ public final class HUDController {
     private let config: AppConfig
 
     /// Panel geometry, in points. Small and unobtrusive at the bottom of the screen.
-    private static let panelSize = NSSize(width: 176, height: 52)
+    private static let panelSize = NSSize(width: 152, height: 44)
     /// How long a terminal state (`done` / `deflate`) stays on screen before ordering out.
     private static let lingerSeconds: TimeInterval = 0.45
 
