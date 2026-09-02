@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import KeyVoiceDesign
 import KeyVoiceStore
 
 /// Home: dictation history grouped by day, search, and a stats card.
@@ -12,7 +13,6 @@ struct HomeView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchField
-            Divider()
             if records.isEmpty {
                 emptyState
             } else {
@@ -20,6 +20,7 @@ struct HomeView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(KeyVoiceTokens.Colors.ink.opacity(0.025))
         .navigationTitle("Home")
         .onAppear(perform: reload)
     }
@@ -42,11 +43,14 @@ struct HomeView: View {
     // MARK: - Subviews
 
     private var searchField: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: KeyVoiceTokens.Spacing.s) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(KeyVoiceTokens.Colors.ice)
             TextField("Search dictations", text: $searchText)
                 .textFieldStyle(.plain)
+                .font(KeyVoiceTokens.Typography.body)
+                .foregroundStyle(KeyVoiceTokens.Colors.ink)
+                .tint(KeyVoiceTokens.Colors.ice)
                 .onChange(of: searchText) { _, _ in reload() }
             if !searchText.isEmpty {
                 Button {
@@ -54,70 +58,80 @@ struct HomeView: View {
                     reload()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.5))
                 }
                 .buttonStyle(.plain)
+                .help("Clear search")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, KeyVoiceTokens.Spacing.m)
+        .padding(.vertical, KeyVoiceTokens.Spacing.s)
+        .glassSurface(shape: Capsule())
+        .padding(.horizontal, KeyVoiceTokens.Spacing.l)
+        .padding(.top, KeyVoiceTokens.Spacing.l)
+        .padding(.bottom, KeyVoiceTokens.Spacing.m)
     }
 
     private var content: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.l) {
                 statsRow
                 ForEach(groups, id: \.day) { group in
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(sectionTitle(for: group.day))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 4)
+                    VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.s) {
+                        SectionHeader(sectionTitle(for: group.day))
+                            .padding(.horizontal, KeyVoiceTokens.Spacing.xs)
                         VStack(spacing: 0) {
                             ForEach(group.rows) { record in
                                 TranscriptRow(record: record,
                                               onCopy: { copy(record) },
                                               onDelete: { delete(record) })
                                 if record.id != group.rows.last?.id {
-                                    Divider().padding(.leading, 12)
+                                    Divider()
+                                        .overlay(KeyVoiceTokens.Colors.ice.opacity(0.18))
+                                        .padding(.horizontal, KeyVoiceTokens.Spacing.l)
                                 }
                             }
                         }
-                        .background(cardBackground)
+                        .glassSurface()
                     }
                 }
             }
-            .padding(16)
+            .padding(.horizontal, KeyVoiceTokens.Spacing.l)
+            .padding(.bottom, KeyVoiceTokens.Spacing.l)
         }
     }
 
     private var statsRow: some View {
         let s = store.stats()
-        return HStack(spacing: 12) {
-            StatTile(title: "Total words", value: s.words.formatted(), systemImage: "text.word.spacing")
-            StatTile(title: "Day streak", value: "\(s.streak)", systemImage: "flame")
-            StatTile(title: "Avg WPM", value: "\(s.avgWPM)", systemImage: "speedometer")
+        return HStack(spacing: KeyVoiceTokens.Spacing.m) {
+            StatTile(title: "Total words", value: s.words.formatted())
+            StatTile(title: "Day streak", value: "\(s.streak)")
+            StatTile(title: "Avg WPM", value: "\(s.avgWPM)")
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "waveform")
-                .font(.system(size: 34, weight: .light))
-                .foregroundStyle(.secondary)
-            Text(searchText.isEmpty ? "No dictations yet" : "No matches")
-                .font(.title3.weight(.semibold))
-            Text(searchText.isEmpty
-                 ? "Hold Right-Option and speak."
-                 : "Try a different search.")
-                .foregroundStyle(.secondary)
+        VStack {
+            GlassCard {
+                VStack(spacing: KeyVoiceTokens.Spacing.m) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 34, weight: .light))
+                        .foregroundStyle(KeyVoiceTokens.Colors.ice)
+                    Text(searchText.isEmpty ? "No dictations yet" : "No matches")
+                        .font(KeyVoiceTokens.Typography.headline)
+                        .foregroundStyle(KeyVoiceTokens.Colors.ink)
+                    Text(searchText.isEmpty
+                         ? "Hold Right-Option and speak."
+                         : "Try a different search.")
+                        .font(KeyVoiceTokens.Typography.body)
+                        .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.62))
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: 380)
         }
+        .padding(KeyVoiceTokens.Spacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var cardBackground: some View {
-        RoundedRectangle(cornerRadius: 10, style: .continuous)
-            .fill(Color(nsColor: .controlBackgroundColor))
     }
 
     // MARK: - Actions
@@ -143,31 +157,6 @@ struct HomeView: View {
     }
 }
 
-/// A single stat tile with a large tabular figure.
-private struct StatTile: View {
-    let title: String
-    let value: String
-    let systemImage: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: systemImage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
-            Text(value)
-                .font(.title2.weight(.semibold))
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-        )
-    }
-}
-
 /// One transcript row: text (2-line truncation) + secondary meta line, with hover actions.
 private struct TranscriptRow: View {
     let record: TranscriptRecord
@@ -177,19 +166,21 @@ private struct TranscriptRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: KeyVoiceTokens.Spacing.m) {
+            VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.xs) {
                 Text(record.text)
+                    .font(KeyVoiceTokens.Typography.body)
+                    .foregroundStyle(KeyVoiceTokens.Colors.ink)
                     .lineLimit(2)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(metaLine)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(KeyVoiceTokens.Typography.caption)
+                    .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.58))
             }
-            Spacer(minLength: 0)
+            Spacer(minLength: KeyVoiceTokens.Spacing.s)
             if hovering {
-                HStack(spacing: 4) {
+                HStack(spacing: KeyVoiceTokens.Spacing.xs) {
                     Button(action: onCopy) {
                         Image(systemName: "doc.on.doc")
                     }
@@ -200,12 +191,18 @@ private struct TranscriptRow: View {
                     .help("Delete")
                 }
                 .buttonStyle(.borderless)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(KeyVoiceTokens.Colors.ice)
+                .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
-        .padding(12)
+        .padding(.horizontal, KeyVoiceTokens.Spacing.l)
+        .padding(.vertical, KeyVoiceTokens.Spacing.m)
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
+        .onHover { isHovering in
+            withAnimation(KeyVoiceTokens.Motion.quick) {
+                hovering = isHovering
+            }
+        }
     }
 
     private var metaLine: String {
