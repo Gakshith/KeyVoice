@@ -25,8 +25,13 @@ struct SettingsView: View {
 
                 LabeledContent("Hotkey") {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text("Right-Option")
-                        Text("Hotkey rebinding is coming soon.")
+                        Picker("Hotkey", selection: hotKeyBinding) {
+                            Text("Right-Option (⌥)").tag(61)
+                            Text("Left-Option (⌥)").tag(58)
+                        }
+                        .labelsHidden()
+                        .frame(maxWidth: 200)
+                        Text("Applies after you restart KeyVoice.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -104,6 +109,13 @@ struct SettingsView: View {
         Binding(
             get: { settings.soundEnabled },
             set: { settings.soundEnabled = $0 }
+        )
+    }
+
+    private var hotKeyBinding: Binding<Int> {
+        Binding(
+            get: { settings.hotKeyCode },
+            set: { settings.hotKeyCode = $0 }
         )
     }
 

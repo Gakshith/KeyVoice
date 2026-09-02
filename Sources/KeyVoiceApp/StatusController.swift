@@ -18,7 +18,7 @@ final class StatusController {
         self.onOpenHub = onOpenHub
         self.onPermissions = onPermissions
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        setSymbol("mic")
+        setSymbol("drop")
 
         let menu = NSMenu()
         let titleItem = NSMenuItem(title: "KeyVoice", action: nil, keyEquivalent: "")
@@ -48,11 +48,11 @@ final class StatusController {
 
         switch status {
         case .idle:
-            setSymbol("mic")
+            setSymbol("drop")
         case .listening:
-            setSymbol("mic.fill")
+            setSymbol("drop.fill")
         case .thinking:
-            setSymbol("mic.fill")
+            setSymbol("drop.fill")
         case .inserted, .insertedRaw:
             setSymbol("checkmark.circle")
             scheduleRevert(after: 1.0)
@@ -69,7 +69,7 @@ final class StatusController {
         let token = revertToken
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self, self.revertToken == token else { return }
-            self.setSymbol("mic")
+            self.setSymbol("drop")
         }
     }
 
