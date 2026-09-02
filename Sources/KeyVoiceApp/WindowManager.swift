@@ -70,6 +70,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if fullBleed {
             window.titlebarAppearsTransparent = true
             window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
             window.isMovableByWindowBackground = true
             window.backgroundColor = .clear
         } else {

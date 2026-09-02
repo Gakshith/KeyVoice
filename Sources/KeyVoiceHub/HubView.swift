@@ -38,6 +38,7 @@ public struct HubView: View {
                 }
             }
         }
+        .toolbarBackground(.hidden, for: .windowToolbar)   // let the aurora run under the titlebar strip
         .frame(minWidth: 760, minHeight: 500)
     }
 }
