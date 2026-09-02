@@ -8,11 +8,13 @@ let package = Package(
     // Deploy target 14 for the app shell. On-device transcription (Apple SpeechAnalyzer) needs macOS 26 and is @available-guarded; below 26 dictation surfaces an error (Apple-only, no fallback).
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "KeyVoice", targets: ["KeyVoiceApp"])
+        .executable(name: "KeyVoice", targets: ["KeyVoiceApp"]),
+        .library(name: "KeyVoiceDesign", targets: ["KeyVoiceDesign"])
     ],
     targets: [
         // The frozen contract: protocols, Target, events, the Coordinator spine. Everything depends on this.
         .target(name: "KeyVoiceCore"),
+        .target(name: "KeyVoiceDesign"),
 
         // One target per work area — filled in on its own feature branch/worktree.
         .target(name: "KeyVoiceHotkey", dependencies: ["KeyVoiceCore"]),   // branch: hotkey
