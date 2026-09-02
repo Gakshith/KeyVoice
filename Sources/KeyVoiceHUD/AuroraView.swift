@@ -43,7 +43,7 @@ struct AuroraView: View {
         }
         .background(.ultraThinMaterial, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.10), lineWidth: 1))
-        .padding(14)
+        .padding(8)
         .scaleEffect(visible ? 1 : 0.9)
         .offset(y: visible ? 0 : 12)
         .opacity(visible ? 1 : 0)
@@ -64,7 +64,7 @@ struct AuroraView: View {
         let w = Double(size.width)
         for layer in 0..<3 {
             var path = Path()
-            let amp = (5 + level * 20) * (1 - Double(layer) * 0.22)
+            let amp = Double(size.height) * (0.14 + level * 0.34) * (1 - Double(layer) * 0.22)
             let speed = 1.4 + Double(layer) * 0.5
             let freq = 1.5 + Double(layer) * 0.6
             let phase = t * speed + Double(layer) * 2
