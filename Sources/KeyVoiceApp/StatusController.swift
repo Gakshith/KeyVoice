@@ -2,43 +2,47 @@ import AppKit
 import KeyVoiceCore
 import KeyVoiceCleanup
 
-/// The menu-bar icon. A single quiet, monochrome SF Symbol microphone that
-/// reflects pipeline state — nothing fails invisibly, but nothing shouts either.
+/// The menu-bar icon. A single quiet, monochrome SF Symbol microphone that reflects pipeline state,
+/// plus the app's quick actions (open the Hub, permissions, API key, quit).
 @MainActor
 final class StatusController {
     private let item: NSStatusItem
+    private let onOpenHub: () -> Void
+    private let onPermissions: () -> Void
 
-    /// Guards the "transient" symbols (checkmark / exclamation): a later state
-    /// change invalidates a pending revert so we never stomp fresh state.
+    /// Guards the transient symbols (checkmark / exclamation): a later state change invalidates a
+    /// pending revert so we never stomp fresh state.
     private var revertToken = 0
 
-    init() {
+    init(onOpenHub: @escaping () -> Void, onPermissions: @escaping () -> Void) {
+        self.onOpenHub = onOpenHub
+        self.onPermissions = onPermissions
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setSymbol("mic")
 
         let menu = NSMenu()
-
         let titleItem = NSMenuItem(title: "KeyVoice", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
-
         menu.addItem(.separator())
 
-        let keyItem = NSMenuItem(title: "Set API Key…", action: #selector(setAPIKey), keyEquivalent: "")
-        keyItem.target = self
-        menu.addItem(keyItem)
-
+        menu.addItem(makeItem("Open KeyVoice", #selector(openHub)))
+        menu.addItem(makeItem("Permissions…", #selector(openPermissions)))
+        menu.addItem(makeItem("Set API Key…", #selector(setAPIKey)))
         menu.addItem(.separator())
-
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
         item.menu = menu
+    }
+
+    private func makeItem(_ title: String, _ action: Selector) -> NSMenuItem {
+        let it = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        it.target = self
+        return it
     }
 
     // MARK: - State
 
     func update(_ status: PipelineStatus) {
-        // Any state change cancels a pending revert to "mic".
         revertToken &+= 1
         item.button?.toolTip = nil
 
@@ -61,7 +65,6 @@ final class StatusController {
         }
     }
 
-    /// Return to the resting "mic" symbol unless a newer state has arrived.
     private func scheduleRevert(after seconds: TimeInterval) {
         let token = revertToken
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
@@ -70,9 +73,6 @@ final class StatusController {
         }
     }
 
-    /// Swap the button's image to a monochrome template SF Symbol. Template
-    /// images tint themselves to match the menu bar (light/dark, active/inactive),
-    /// so there is no colour and no bounce — just a calm mic.
     private func setSymbol(_ name: String) {
         guard let button = item.button else { return }
         let image = NSImage(systemSymbolName: name, accessibilityDescription: "KeyVoice")
@@ -81,11 +81,14 @@ final class StatusController {
         button.title = ""
     }
 
-    // MARK: - API key
+    // MARK: - Actions
 
-    @objc private func setAPIKey() {
-        // .accessory apps have no Dock icon and don't own the menu bar focus,
-        // so bring the app forward or the modal opens behind everything.
+    @objc private func openHub() { onOpenHub() }
+    @objc private func openPermissions() { onPermissions() }
+    @objc private func setAPIKey() { promptForAPIKey() }
+
+    /// Presents the Anthropic API-key dialog. Public so the Hub's Settings can trigger the same flow.
+    func promptForAPIKey() {
         NSApp.activate(ignoringOtherApps: true)
 
         let alert = NSAlert()
@@ -103,10 +106,10 @@ final class StatusController {
 
         let trimmed = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            let emptyAlert = NSAlert()
-            emptyAlert.messageText = "No key entered"
-            emptyAlert.informativeText = "Nothing was saved."
-            emptyAlert.runModal()
+            let empty = NSAlert()
+            empty.messageText = "No key entered"
+            empty.informativeText = "Nothing was saved."
+            empty.runModal()
             return
         }
 
@@ -114,7 +117,6 @@ final class StatusController {
             try Keychain.save(trimmed)
         } catch {
             Log.error("Failed to save API key: \(error)")
-
             let errorAlert = NSAlert()
             errorAlert.messageText = "Couldn’t save the key"
             errorAlert.informativeText = error.localizedDescription

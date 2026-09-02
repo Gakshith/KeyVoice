@@ -5,6 +5,7 @@ import KeyVoiceInsert
 import KeyVoiceAudio
 import KeyVoiceCleanup
 import KeyVoiceHUD
+import KeyVoiceStore
 
 /// Wires the concrete implementations into the Coordinator and owns app lifetime.
 @MainActor
@@ -13,6 +14,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var status: StatusController?
     private var hud: HUDController?
     private var levelMeter: AudioLevelMeter?
+    private var store: Store?
+    private var settings: SettingsStore?
+    private var windowManager: WindowManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A menu-bar (.accessory) app has no main menu, so ⌘X/⌘C/⌘V/⌘A have nothing to route
@@ -22,7 +26,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let config = AppConfig()
 
-        let status = StatusController()
+        let store = Store()
+        let settings = SettingsStore()
+        self.store = store
+        self.settings = settings
+
+        let windowManager = WindowManager(store: store, settings: settings,
+                                          onSetAPIKey: { [weak self] in self?.status?.promptForAPIKey() })
+        self.windowManager = windowManager
+
+        let status = StatusController(
+            onOpenHub: { windowManager.showHub() },
+            onPermissions: { windowManager.showOnboarding() }
+        )
         let hud = HUDController(config: config)
         let levelMeter = AudioLevelMeter()
         self.status = status
@@ -47,6 +63,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Live mic level → meter → HUD (passive tap alongside the transcriber).
         coordinator.audioMonitor = { [weak levelMeter] buffer in levelMeter?.process(buffer) }
         levelMeter.onLevel = { [weak hud] level in hud?.setLevel(level) }
+        // Completed dictations go to local history.
+        coordinator.onCompleted = { [weak store] result in store?.record(result) }
 
         do {
             try coordinator.start()
@@ -55,6 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             status.update(.error(error.localizedDescription))
         }
         self.coordinator = coordinator
+
+        // First run: walk the user through permissions.
+        if settings.needsOnboarding {
+            windowManager.showOnboarding()
+        }
     }
 
     /// Installs a minimal main menu with a standard Edit menu so the system editing shortcuts

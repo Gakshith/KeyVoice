@@ -21,11 +21,17 @@ let package = Package(
         .target(name: "KeyVoiceCleanup", dependencies: ["KeyVoiceCore"]),  // branch: cleanup
         .target(name: "KeyVoiceHUD",     dependencies: ["KeyVoiceCore"]),  // branch: hud — floating Aurora HUD
 
+        // MVP product modules.
+        .target(name: "KeyVoiceStore",   dependencies: ["KeyVoiceCore"]),                    // local history + dictionary + settings (SwiftData)
+        .target(name: "KeyVoiceHub",     dependencies: ["KeyVoiceCore", "KeyVoiceStore"]),   // the Hub window: Home / Dictionary / Settings
+        .target(name: "KeyVoiceOnboarding", dependencies: ["KeyVoiceCore", "KeyVoiceStore"]),// first-run permission walkthrough
+
         // The app shell wires the concrete implementations into the Coordinator.
         .executableTarget(
             name: "KeyVoiceApp",
             dependencies: [
-                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup", "KeyVoiceHUD"
+                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup",
+                "KeyVoiceHUD", "KeyVoiceStore", "KeyVoiceHub", "KeyVoiceOnboarding"
             ]
         ),
 
