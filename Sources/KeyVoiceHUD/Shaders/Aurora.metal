@@ -27,6 +27,20 @@ static float fbm(float2 p) {
     return s;
 }
 
+// The KeyVoice voice-spectrum ramp: violet -> blue -> cyan -> amber -> pink, left to right.
+static float3 spectrum(float t) {
+    const float3 c0 = float3(0.416, 0.298, 1.000);
+    const float3 c1 = float3(0.298, 0.482, 1.000);
+    const float3 c2 = float3(0.184, 0.816, 0.812);
+    const float3 c3 = float3(1.000, 0.694, 0.306);
+    const float3 c4 = float3(1.000, 0.361, 0.541);
+    t = clamp(t, 0.0, 1.0) * 4.0;
+    if (t < 1.0) return mix(c0, c1, t);
+    if (t < 2.0) return mix(c1, c2, t - 1.0);
+    if (t < 3.0) return mix(c2, c3, t - 2.0);
+    return mix(c3, c4, t - 3.0);
+}
+
 [[ stitchable ]]
 half4 aurora(float2 pos, half4 color,
              float2 size, float time, float level, float think, float done, float amber) {
@@ -55,9 +69,9 @@ half4 aurora(float2 pos, half4 color,
         ring = smoothstep(0.16, 0.0, abs(length(luv * float2(1.0, 1.8)) - rr)) * (1.0 - done);
     }
 
-    // Colour: white -> ice with volume; amber on failure.
-    float3 ice = mix(float3(1.0), float3(0.66, 0.85, 1.0), level);
-    float3 tint = mix(ice, float3(0.92, 0.70, 0.45), amber);
+    // Colour: the voice spectrum across the pill, brightened toward white by volume; amber on failure.
+    float3 base = mix(spectrum(uv.x), float3(1.0), level * 0.25);
+    float3 tint = mix(base, float3(0.95, 0.72, 0.42), amber);
 
     float intensity = clamp(aur * (0.6 + level * 0.6) + ring * 0.9, 0.0, 1.0);
     float3 rgb = tint * intensity;
