@@ -81,7 +81,7 @@ struct SettingsView: View {
 
                     if settings.cleanupProvider != "off" {
                         Divider().overlay(KeyVoiceTokens.Colors.line)
-                        SettingsRow("Translate to", caption: "Dictate in any language; insert it in this one.") {
+                        SettingsRow("Translate to", caption: "Transcribes your English, then translates it into this language.") {
                             Picker("", selection: targetLanguageBinding) {
                                 Text("Don't translate").tag("off")
                                 ForEach(Self.languages, id: \.self) { Text($0).tag($0) }
@@ -103,7 +103,7 @@ struct SettingsView: View {
                 SettingsGroup("About") {
                     SettingsRow("Application") { Text("KeyVoice").foregroundStyle(KeyVoiceTokens.Colors.text2) }
                     Divider().overlay(KeyVoiceTokens.Colors.line)
-                    SettingsNote("Fast, system-wide push-to-talk voice typing. All data stays on this Mac.")
+                    SettingsNote("Fast, system-wide push-to-talk voice typing. Your audio always stays on this Mac.")
                 }
             }
             .padding(.horizontal, 32).padding(.top, 30).padding(.bottom, 34)
@@ -116,7 +116,7 @@ struct SettingsView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Settings").font(.studioSerif(30)).foregroundStyle(KeyVoiceTokens.Colors.text)
-            Text("Everything local. No account, no cloud.")
+            Text("No account. Your audio always stays on this Mac.")
                 .font(.system(size: 14.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
         }
     }

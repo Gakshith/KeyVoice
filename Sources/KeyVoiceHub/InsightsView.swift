@@ -143,7 +143,7 @@ struct InsightsView: View {
                     Text("0 bytes").font(.studioSerif(30)).foregroundStyle(KeyVoiceTokens.Colors.good)
                 }
                 Spacer()
-                Text("Every word is transcribed on-device and never uploaded.")
+                Text("Your voice is transcribed on-device and never leaves this Mac.")
                     .font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.text2)
                     .frame(maxWidth: 240, alignment: .trailing).multilineTextAlignment(.trailing)
             }
