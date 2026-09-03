@@ -136,24 +136,24 @@ private struct HistoryRow: View {
                     .font(.system(size: 12.5, weight: .medium)).foregroundStyle(KeyVoiceTokens.Colors.fog)
             }
             Spacer(minLength: 8)
-            // Actions are always reachable via the context menu; on hover they surface as buttons.
-            if hovering || copied {
-                HStack(spacing: 6) {
-                    Button(action: copyAndConfirm) {
-                        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
-                            .labelStyle(.iconOnly).font(.system(size: 13))
-                            .foregroundStyle(copied ? KeyVoiceTokens.Colors.good : KeyVoiceTokens.Colors.fog)
-                    }
-                    .buttonStyle(.plain).focusEffectDisabled()
-                    .help(copied ? "Copied" : "Copy").accessibilityLabel(copied ? "Copied" : "Copy transcript")
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
-                    }
-                    .buttonStyle(.plain).focusEffectDisabled()
-                    .help("Delete").accessibilityLabel("Delete transcript")
+            // Always reserve the actions' width; toggle only opacity so hovering never reflows the
+            // text. (The buttons show icons only, so their width is constant across states.)
+            HStack(spacing: 6) {
+                Button(action: copyAndConfirm) {
+                    Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .labelStyle(.iconOnly).font(.system(size: 13))
+                        .foregroundStyle(copied ? KeyVoiceTokens.Colors.good : KeyVoiceTokens.Colors.fog)
                 }
-                .transition(.opacity)
+                .buttonStyle(.plain).focusEffectDisabled()
+                .help(copied ? "Copied" : "Copy").accessibilityLabel(copied ? "Copied" : "Copy transcript")
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                }
+                .buttonStyle(.plain).focusEffectDisabled()
+                .help("Delete").accessibilityLabel("Delete transcript")
             }
+            .opacity(hovering || copied ? 1 : 0)
+            .allowsHitTesting(hovering || copied)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18).padding(.vertical, 15)

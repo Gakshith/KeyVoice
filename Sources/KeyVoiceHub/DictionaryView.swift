@@ -169,14 +169,14 @@ private struct DictionaryRow: View {
             if entry.starred {
                 Image(systemName: "star.fill").font(.system(size: 12)).foregroundStyle(KeyVoiceTokens.Colors.accent)
             }
-            if hovering {
-                Button(role: .destructive, action: onDelete) {
-                    Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
-                }
-                .buttonStyle(.plain).focusEffectDisabled()
-                .help("Delete replacement").accessibilityLabel("Delete \(entry.from)")
-                .transition(.opacity)
+            // Reserve the delete button's space always; toggle only opacity so hover never reflows.
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
             }
+            .buttonStyle(.plain).focusEffectDisabled()
+            .help("Delete replacement").accessibilityLabel("Delete \(entry.from)")
+            .opacity(hovering ? 1 : 0)
+            .allowsHitTesting(hovering)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 18).padding(.vertical, 14)
