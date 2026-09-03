@@ -29,7 +29,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if hubWindow == nil {
             hubWindow = makeWindow(
                 title: "KeyVoice",
-                content: HubView(store: store, settings: settings, onSetAPIKey: onSetAPIKey),
+                content: StudioShell(store: store, settings: settings, onSetAPIKey: onSetAPIKey),
                 fullBleed: true
             )
         }

@@ -1,8 +1,9 @@
 #!/usr/bin/env swift
-// Generates KeyVoice's app icon — a glass droplet holding a soundwave — as a full .iconset and,
-// via iconutil, Packaging/AppIcon.icns. Pure CoreGraphics so it's reproducible (no design tool).
-// Usage: swift Scripts/gen-icon.swift            → writes /tmp/keyvoice-icon-1024.png + Packaging/AppIcon.icns
-//        swift Scripts/gen-icon.swift preview     → writes only /tmp/keyvoice-icon-1024.png (for review)
+// Generates KeyVoice's app icon — a keycap holding a voice spectrum — as a full .iconset and,
+// via iconutil, Packaging/AppIcon.icns. "Key" + "Voice": the mark names the push-to-talk interaction.
+// Pure CoreGraphics so it's reproducible (no design tool).
+// Usage: swift Scripts/gen-icon.swift            → /tmp/keyvoice-icon-1024.png + Packaging/AppIcon.icns
+//        swift Scripts/gen-icon.swift preview     → only /tmp/keyvoice-icon-1024.png (for review)
 import Foundation
 import CoreGraphics
 import ImageIO
@@ -14,52 +15,65 @@ func draw(_ ctx: CGContext, _ S: CGFloat) {
     }
     ctx.setAllowsAntialiasing(true)
 
-    // Rounded-rect background (squircle-ish) with a cool night gradient.
-    let r = S * 0.2235
-    let bg = CGPath(roundedRect: CGRect(x: 0, y: 0, width: S, height: S), cornerWidth: r, cornerHeight: r, transform: nil)
+    // Warm-paper tile (matches the Studio canvas).
+    let corner = S * 0.2235
+    let bg = CGPath(roundedRect: CGRect(x: 0, y: 0, width: S, height: S), cornerWidth: corner, cornerHeight: corner, transform: nil)
     ctx.saveGState(); ctx.addPath(bg); ctx.clip()
-    let grad = CGGradient(colorsSpace: cs, colors: [c(0.07,0.12,0.24), c(0.03,0.04,0.09)] as CFArray, locations: [0, 1])!
-    ctx.drawLinearGradient(grad, start: CGPoint(x: 0, y: S), end: CGPoint(x: 0, y: 0), options: [])
-    // soft top glow
-    let glow = CGGradient(colorsSpace: cs, colors: [c(0.30,0.55,0.95,0.35), c(0.30,0.55,0.95,0)] as CFArray, locations: [0,1])!
-    ctx.drawRadialGradient(glow, startCenter: CGPoint(x: S*0.5, y: S*0.86), startRadius: 0, endCenter: CGPoint(x: S*0.5, y: S*0.86), endRadius: S*0.6, options: [])
+    let paper = CGGradient(colorsSpace: cs, colors: [c(0.972, 0.964, 0.945), c(0.902, 0.890, 0.860)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(paper, start: CGPoint(x: 0, y: S), end: CGPoint(x: 0, y: 0), options: [])
+    // faint warm top glow
+    let glow = CGGradient(colorsSpace: cs, colors: [c(1, 1, 0.98, 0.5), c(1, 1, 0.98, 0)] as CFArray, locations: [0, 1])!
+    ctx.drawRadialGradient(glow, startCenter: CGPoint(x: S*0.5, y: S*0.9), startRadius: 0, endCenter: CGPoint(x: S*0.5, y: S*0.9), endRadius: S*0.7, options: [])
 
-    // Droplet path (point up, round bottom).
-    let cx = S*0.5, cy = S*0.455, R = S*0.205
-    let topY = cy + R*2.1
-    let drop = CGMutablePath()
-    drop.move(to: CGPoint(x: cx, y: topY))
-    // Convex sides that bulge out then taper to the tip → a rounded teardrop, not an arrowhead.
-    drop.addCurve(to: CGPoint(x: cx - R, y: cy),
-                  control1: CGPoint(x: cx - R*0.86, y: topY - R*0.75),
-                  control2: CGPoint(x: cx - R*1.08, y: cy + R*0.72))
-    drop.addArc(center: CGPoint(x: cx, y: cy), radius: R, startAngle: .pi, endAngle: 0, clockwise: true)
-    drop.addCurve(to: CGPoint(x: cx, y: topY),
-                  control1: CGPoint(x: cx + R*1.08, y: cy + R*0.72),
-                  control2: CGPoint(x: cx + R*0.86, y: topY - R*0.75))
-    drop.closeSubpath()
+    // --- Keycap ------------------------------------------------------------------------------
+    let capW = S * 0.52, capH = S * 0.52
+    let capX = (S - capW) / 2, capY = (S - capH) / 2 - S * 0.01
+    let capR = S * 0.155
+    let cap = CGPath(roundedRect: CGRect(x: capX, y: capY, width: capW, height: capH), cornerWidth: capR, cornerHeight: capR, transform: nil)
 
-    // Glass fill (translucent ice) + rim.
-    ctx.saveGState(); ctx.addPath(drop); ctx.clip()
-    let glass = CGGradient(colorsSpace: cs, colors: [c(0.80,0.91,1.0,0.42), c(0.52,0.76,1.0,0.24)] as CFArray, locations: [0,1])!
-    ctx.drawLinearGradient(glass, start: CGPoint(x: 0, y: topY), end: CGPoint(x: 0, y: cy - R*1.25), options: [])
-    // specular highlight
-    let spec = CGGradient(colorsSpace: cs, colors: [c(1,1,1,0.55), c(1,1,1,0)] as CFArray, locations: [0,1])!
-    ctx.drawRadialGradient(spec, startCenter: CGPoint(x: cx - R*0.4, y: cy + R*0.5), startRadius: 0, endCenter: CGPoint(x: cx - R*0.4, y: cy + R*0.5), endRadius: R*0.9, options: [])
+    // Drop shadow of the cap onto the paper.
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -S*0.012), blur: S*0.05, color: c(0.10, 0.08, 0.06, 0.35))
+    ctx.addPath(cap); ctx.setFillColor(c(0.09, 0.082, 0.07)); ctx.fillPath()
     ctx.restoreGState()
-    ctx.addPath(drop); ctx.setStrokeColor(c(0.66,0.85,1.0,0.55)); ctx.setLineWidth(S*0.006); ctx.strokePath()
 
-    // Soundwave — rounded bars centered in the droplet, ice/white.
-    let bars: [CGFloat] = [0.42, 0.72, 1.0, 0.72, 0.48]
-    let bw = R*0.16, gap = R*0.22
-    let total = CGFloat(bars.count)*bw + CGFloat(bars.count - 1)*gap
-    var x = cx - total/2
-    for h in bars {
-        let bh = R*0.95*h
-        let rect = CGRect(x: x, y: cy - bh/2, width: bw, height: bh)
+    // Keycap body: vertical velvet gradient for depth.
+    ctx.saveGState(); ctx.addPath(cap); ctx.clip()
+    let velvet = CGGradient(colorsSpace: cs, colors: [c(0.145, 0.129, 0.109), c(0.055, 0.047, 0.039)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(velvet, start: CGPoint(x: 0, y: capY + capH), end: CGPoint(x: 0, y: capY), options: [])
+    ctx.restoreGState()
+
+    // Top rim highlight + a dished inner face.
+    ctx.addPath(cap); ctx.setStrokeColor(c(1, 1, 1, 0.14)); ctx.setLineWidth(S*0.007); ctx.strokePath()
+    let inset = S * 0.045
+    let faceRect = CGRect(x: capX + inset, y: capY + inset, width: capW - inset*2, height: capH - inset*2)
+    let faceR = capR - inset*0.7
+    let face = CGPath(roundedRect: faceRect, cornerWidth: faceR, cornerHeight: faceR, transform: nil)
+    ctx.saveGState(); ctx.addPath(face); ctx.clip()
+    let dish = CGGradient(colorsSpace: cs, colors: [c(0.180, 0.160, 0.137), c(0.086, 0.074, 0.062)] as CFArray, locations: [0, 1])!
+    ctx.drawLinearGradient(dish, start: CGPoint(x: 0, y: faceRect.maxY), end: CGPoint(x: 0, y: faceRect.minY), options: [])
+    ctx.restoreGState()
+
+    // --- Voice spectrum on the keycap face ---------------------------------------------------
+    // Five rounded bars, left→right spectrum, glowing.
+    let spectrum = [c(0.416, 0.298, 1.0), c(0.298, 0.482, 1.0), c(0.184, 0.816, 0.812), c(1.0, 0.694, 0.306), c(1.0, 0.361, 0.541)]
+    let heights: [CGFloat] = [0.40, 0.72, 1.0, 0.66, 0.46]
+    let n = heights.count
+    let bw = faceRect.width * 0.085
+    let gap = (faceRect.width * 0.60 - bw) / CGFloat(n - 1)
+    let totalW = CGFloat(n) * bw + CGFloat(n - 1) * (gap - bw)
+    var x = faceRect.midX - totalW / 2
+    let maxBar = faceRect.height * 0.62
+    for i in 0..<n {
+        let bh = maxBar * heights[i]
+        let rect = CGRect(x: x, y: faceRect.midY - bh/2, width: bw, height: bh)
+        // soft glow
+        ctx.saveGState()
+        ctx.setShadow(offset: .zero, blur: S*0.02, color: spectrum[i].copy(alpha: 0.7)!)
         ctx.addPath(CGPath(roundedRect: rect, cornerWidth: bw/2, cornerHeight: bw/2, transform: nil))
-        ctx.setFillColor(c(0.93,0.97,1.0,0.95)); ctx.fillPath()
-        x += bw + gap
+        ctx.setFillColor(spectrum[i]); ctx.fillPath()
+        ctx.restoreGState()
+        x += gap
     }
     ctx.restoreGState()
 }
