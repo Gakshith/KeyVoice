@@ -12,12 +12,17 @@ struct InsightsView: View {
     @State private var topApps: [(name: String, count: Int)] = []
     @State private var days: [Date: Int] = [:]
 
+    // Adaptive columns: the stat cards and the two panels wrap to fewer
+    // columns (down to one) as the window narrows.
+    private let statColumns = [GridItem(.adaptive(minimum: 200), spacing: 16)]
+    private let panelColumns = [GridItem(.adaptive(minimum: 320), spacing: 16)]
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
 
-                HStack(spacing: 16) {
+                LazyVGrid(columns: statColumns, alignment: .leading, spacing: 16) {
                     StudioCard {
                         VStack(alignment: .leading, spacing: 10) {
                             StudioStat(value: "\(stats.avgWPM)", unit: "wpm", label: "Average pace")
@@ -32,7 +37,7 @@ struct InsightsView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                HStack(alignment: .top, spacing: 16) {
+                LazyVGrid(columns: panelColumns, alignment: .leading, spacing: 16) {
                     usageCard.frame(maxWidth: .infinity)
                     heatmapCard.frame(maxWidth: .infinity)
                 }

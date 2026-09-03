@@ -30,7 +30,7 @@ public struct StudioShell: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(KeyVoiceTokens.Colors.paper)
         }
-        .frame(minWidth: 920, minHeight: 640)
+        .frame(minWidth: 700, minHeight: 500)
         .background(KeyVoiceTokens.Colors.paper)
         .environment(\.colorScheme, .light)   // committed warm-light world
     }

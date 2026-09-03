@@ -12,9 +12,17 @@ struct DictationView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 greeting
-                HStack(alignment: .top, spacing: 18) {
-                    hero
-                    rail.frame(width: 280)
+                ViewThatFits(in: .horizontal) {
+                    // Wide: hero beside a fixed stat rail.
+                    HStack(alignment: .top, spacing: 18) {
+                        hero.frame(minWidth: 320)
+                        rail.frame(width: 280)
+                    }
+                    // Narrow: stack the rail under the hero, full width.
+                    VStack(alignment: .leading, spacing: 18) {
+                        hero
+                        rail.frame(maxWidth: .infinity)
+                    }
                 }
             }
             .padding(.horizontal, 32)

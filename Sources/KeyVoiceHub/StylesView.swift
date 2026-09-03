@@ -13,9 +13,10 @@ struct StylesView: View {
     @State private var selectedKind = StyleKind.clean.rawValue
     @State private var showingAddSheet = false
 
+    // Adaptive: two-up when there's room, collapsing to a single column
+    // as the window narrows.
     private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16)
+        GridItem(.adaptive(minimum: 240), spacing: 16)
     ]
 
     var body: some View {
