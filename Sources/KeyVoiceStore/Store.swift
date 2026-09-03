@@ -10,6 +10,19 @@ public final class Store {
     public let context: ModelContext
     private let container: ModelContainer
 
+    /// Set by the app shell to show persistence failures to the user instead of swallowing them (R-3).
+    public var onSaveError: ((String) -> Void)?
+
+    /// Persist pending changes, surfacing any failure rather than dropping it silently.
+    private func save() {
+        do {
+            try context.save()
+        } catch {
+            Log.error("store save failed: \(error.localizedDescription)")
+            onSaveError?("Couldn’t save your change: \(error.localizedDescription)")
+        }
+    }
+
     /// Builds the on-disk store. Falls back to an in-memory store if the disk container can't be
     /// created, so the app still runs (history just won't persist) rather than crashing.
     public init() {
@@ -38,7 +51,7 @@ public final class Store {
             wpm: result.wordsPerMinute
         )
         context.insert(entry)
-        try? context.save()
+        save()
     }
 
     /// Recent transcripts, newest first, optionally filtered by a case-insensitive search.
@@ -52,7 +65,7 @@ public final class Store {
 
     public func delete(_ record: TranscriptRecord) {
         context.delete(record)
-        try? context.save()
+        save()
     }
 
     public func clearHistory() {
@@ -60,7 +73,7 @@ public final class Store {
         for record in records {
             context.delete(record)
         }
-        try? context.save()
+        save()
     }
 
     /// Aggregate stats for the Home card: total words, current day-streak, average WPM.
@@ -102,12 +115,12 @@ public final class Store {
 
     public func addDictionaryEntry(from: String, to: String) {
         context.insert(DictionaryEntry(from: from, to: to))
-        try? context.save()
+        save()
     }
 
     public func delete(_ entry: DictionaryEntry) {
         context.delete(entry)
-        try? context.save()
+        save()
     }
 
     // MARK: - Styles
@@ -130,12 +143,12 @@ public final class Store {
             context.delete(existing)
         }
         context.insert(StyleRule(appBundleId: appBundleId, appName: appName, kind: kind))
-        try? context.save()
+        save()
     }
 
     public func delete(_ rule: StyleRule) {
         context.delete(rule)
-        try? context.save()
+        save()
     }
 
     // MARK: - Snippets
@@ -149,7 +162,7 @@ public final class Store {
 
     public func addSnippet(trigger: String, expansion: String) {
         context.insert(Snippet(trigger: trigger, expansion: expansion))
-        try? context.save()
+        save()
     }
 
     /// Expand snippet triggers found in a transcript (whole-phrase, case-insensitive). Longer
@@ -164,7 +177,7 @@ public final class Store {
 
     public func delete(_ snippet: Snippet) {
         context.delete(snippet)
-        try? context.save()
+        save()
     }
 
     /// Apply the user's replacements to a transcript (whole-word, case-insensitive). Used as a

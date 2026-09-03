@@ -39,6 +39,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.store = store
         self.settings = settings
 
+        // Surface persistence failures instead of dropping them silently (audit R-3).
+        store.onSaveError = { message in
+            let alert = NSAlert()
+            alert.messageText = "Couldn’t save your change"
+            alert.informativeText = message
+            alert.alertStyle = .warning
+            alert.runModal()
+        }
+
         // Seed runtime config from the user's saved settings.
         var config = AppConfig()
         config.rightOptionKeyCode = Int64(settings.hotKeyCode)

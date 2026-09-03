@@ -14,6 +14,7 @@ struct SettingsView: View {
     let onSetAPIKey: () -> Void
 
     @State private var ollamaModels: [String] = []
+    @State private var keyIsSet = false
 
     var body: some View {
         ScrollView {
@@ -74,8 +75,14 @@ struct SettingsView: View {
 
                     if settings.cleanupProvider == "claude" {
                         Divider().overlay(KeyVoiceTokens.Colors.line)
-                        SettingsRow("Anthropic API key") {
-                            Button("Set API Key…", action: onSetAPIKey).buttonStyle(.plain).foregroundStyle(KeyVoiceTokens.Colors.accent)
+                        SettingsRow("Anthropic API key",
+                                    caption: keyIsSet ? "A key is saved in your Keychain."
+                                                      : "No key set — cleanup stays raw until you add one.") {
+                            Button(keyIsSet ? "Replace key…" : "Set API Key…") {
+                                onSetAPIKey()
+                                keyIsSet = Keychain.load() != nil
+                            }
+                            .buttonStyle(.plain).focusEffectDisabled().foregroundStyle(KeyVoiceTokens.Colors.accent)
                         }
                     }
 
@@ -131,8 +138,18 @@ struct SettingsView: View {
     }
     private var launchAtLoginBinding: Binding<Bool> {
         Binding(get: { settings.launchAtLogin }, set: { enabled in
-            settings.launchAtLogin = enabled
-            if enabled { try? SMAppService.mainApp.register() } else { try? SMAppService.mainApp.unregister() }
+            do {
+                if enabled { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+                settings.launchAtLogin = enabled
+            } catch {
+                // The system rejected the change — don't leave the toggle lying; revert and explain.
+                settings.launchAtLogin = !enabled
+                let alert = NSAlert()
+                alert.messageText = "Couldn’t update Launch at Login"
+                alert.informativeText = error.localizedDescription
+                alert.alertStyle = .warning
+                alert.runModal()
+            }
         })
     }
     private var showHUDBinding: Binding<Bool> { Binding(get: { settings.showHUD }, set: { settings.showHUD = $0 }) }
@@ -146,6 +163,7 @@ struct SettingsView: View {
                                     "Hindi", "Telugu", "Mandarin Chinese", "Japanese", "Korean", "Arabic"]
 
     private func detect() {
+        keyIsSet = Keychain.load() != nil
         Task {
             let models = await OllamaCleaner.detectModels()
             await MainActor.run {
