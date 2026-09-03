@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import KeyVoiceCore
 import KeyVoiceStore
 import KeyVoiceHub
 import KeyVoiceOnboarding
@@ -12,18 +13,24 @@ import KeyVoiceOnboarding
 final class WindowManager: NSObject, NSWindowDelegate {
     private let store: Store
     private let settings: SettingsStore
+    private let readiness: Readiness
     private let onSetAPIKey: () -> Void
     private let onRearm: () -> Void
+    private let onFix: (ReadinessItem) -> Void
 
     private var hubWindow: NSWindow?
     private var onboardingWindow: NSWindow?
     private let hubNav = HubNavigation()
 
-    init(store: Store, settings: SettingsStore, onSetAPIKey: @escaping () -> Void, onRearm: @escaping () -> Void) {
+    init(store: Store, settings: SettingsStore, readiness: Readiness,
+         onSetAPIKey: @escaping () -> Void, onRearm: @escaping () -> Void,
+         onFix: @escaping (ReadinessItem) -> Void) {
         self.store = store
         self.settings = settings
+        self.readiness = readiness
         self.onSetAPIKey = onSetAPIKey
         self.onRearm = onRearm
+        self.onFix = onFix
     }
 
     func showHub(section: StudioSection? = nil) {
@@ -31,7 +38,8 @@ final class WindowManager: NSObject, NSWindowDelegate {
         if hubWindow == nil {
             hubWindow = makeWindow(
                 title: "KeyVoice",
-                content: StudioShell(store: store, settings: settings, nav: hubNav, onSetAPIKey: onSetAPIKey),
+                content: StudioShell(store: store, settings: settings, readiness: readiness, nav: hubNav,
+                                     onSetAPIKey: onSetAPIKey, onFix: onFix),
                 fullBleed: true
             )
         }

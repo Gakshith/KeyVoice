@@ -1,7 +1,7 @@
 import Foundation
 
 /// Tunables in one place. Values come from the plan's decisions and are easy to adjust during Phase 6.
-public struct AppConfig {
+public struct AppConfig: Sendable {
     /// Minimum hold before we treat it as dictation (ignores accidental taps and ⌥-accent combos).
     public var minHold: TimeInterval = 0.20
     /// Hard cap on a single dictation; auto-commits and warns past this.

@@ -13,7 +13,8 @@ import KeyVoiceCore
 /// `SettingsStore` migrates it on launch.
 public final class RoutingCleaner: Cleaner {
     private let config: AppConfig
-    private let defaults: UserDefaults
+    // UserDefaults is thread-safe by contract but not marked Sendable; this is a shared read.
+    nonisolated(unsafe) private let defaults: UserDefaults
 
     public init(config: AppConfig = AppConfig(), defaults: UserDefaults = .standard) {
         self.config = config

@@ -1,4 +1,5 @@
 import SwiftUI
+import KeyVoiceCore
 import KeyVoiceDesign
 import KeyVoiceStore
 
@@ -8,14 +9,19 @@ import KeyVoiceStore
 public struct StudioShell: View {
     let store: Store
     let settings: SettingsStore
+    let readiness: Readiness
     let nav: HubNavigation
     let onSetAPIKey: () -> Void
+    let onFix: (ReadinessItem) -> Void
 
-    public init(store: Store, settings: SettingsStore, nav: HubNavigation, onSetAPIKey: @escaping () -> Void) {
+    public init(store: Store, settings: SettingsStore, readiness: Readiness, nav: HubNavigation,
+                onSetAPIKey: @escaping () -> Void, onFix: @escaping (ReadinessItem) -> Void) {
         self.store = store
         self.settings = settings
+        self.readiness = readiness
         self.nav = nav
         self.onSetAPIKey = onSetAPIKey
+        self.onFix = onFix
     }
 
     public var body: some View {
@@ -82,7 +88,8 @@ public struct StudioShell: View {
 
     @ViewBuilder private var detail: some View {
         switch nav.section {
-        case .dictation:  DictationView(store: store)
+        case .dictation:  DictationView(store: store, settings: settings, readiness: readiness,
+                                        onFix: onFix, onNavigate: { nav.section = $0 })
         case .history:    HistoryView(store: store)
         case .dictionary: DictionaryView(store: store)
         case .styles:     StylesView(store: store)

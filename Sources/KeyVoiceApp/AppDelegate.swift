@@ -1,4 +1,7 @@
 import AppKit
+import AVFoundation
+import CoreGraphics
+import ApplicationServices
 import KeyVoiceCore
 import KeyVoiceHotkey
 import KeyVoiceInsert
@@ -18,6 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var store: Store?
     private var settings: SettingsStore?
     private var windowManager: WindowManager?
+    private var speech: SpeechTranscriberEngine?
+    /// The live readiness the Dictation cockpit reads. Kept current from OS permission state + the
+    /// speech-asset pre-warm, so the home screen tells the truth (audit P0 · TRUST).
+    private let readiness = Readiness()
+    private var readinessTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A menu-bar (.accessory) app has no main menu, so ⌘X/⌘C/⌘V/⌘A have nothing to route
@@ -35,9 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         config.rightOptionKeyCode = Int64(settings.hotKeyCode)
 
         let windowManager = WindowManager(
-            store: store, settings: settings,
+            store: store, settings: settings, readiness: readiness,
             onSetAPIKey: { [weak self] in self?.status?.promptForAPIKey() },
-            onRearm: { [weak self] in self?.rearm() }
+            onRearm: { [weak self] in self?.rearm() },
+            onFix: { [weak self] item in self?.fix(item) }
         )
         self.windowManager = windowManager
 
@@ -56,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Apple on-device streaming transcriber (macOS 26). Hoisted so we can hook its live partials.
         let speech = SpeechTranscriberEngine()
+        self.speech = speech
         speech.onPartial = { [weak caption, weak settings] text in
             Task { @MainActor in
                 guard settings?.showHUD ?? true else { return }   // caption rides with the HUD toggle
@@ -105,6 +115,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.coordinator = coordinator
         rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)
 
+        // Seed readiness and keep it live: poll OS permission state (cheap) so the cockpit updates as
+        // the user grants permissions in System Settings, and pre-warm the on-device speech model so a
+        // first dictation never blocks on the download.
+        refreshReadiness()
+        readinessTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshReadiness() }
+        }
+        Task { [weak self] in
+            let ready = await speech.ensureAssetsReady()
+            self?.readiness.speechReady = ready
+        }
+
         // First run: walk the user through permissions.
         if settings.needsOnboarding {
             windowManager.showOnboarding()
@@ -118,10 +140,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard let coordinator else { return }
         do {
             try coordinator.start()
+            readiness.hotkeyArmed = true
         } catch {
+            readiness.hotkeyArmed = false
             Log.error("arm failed: \(error.localizedDescription)")
             status?.update(.error(error.localizedDescription))
         }
+        refreshReadiness()
+    }
+
+    /// Re-read OS permission state into `readiness` (cheap; safe to call on a timer).
+    private func refreshReadiness() {
+        readiness.accessibility = AXIsProcessTrusted()
+        readiness.inputMonitoring = CGPreflightListenEventAccess()
+        readiness.microphone = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    }
+
+    /// A repair-card button: open the right System Settings pane, or re-check the speech model.
+    private func fix(_ item: ReadinessItem) {
+        if let anchor = item.settingsAnchor,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
+            NSWorkspace.shared.open(url)
+        } else {
+            // .speech — no settings pane; re-run the asset preflight (may download).
+            Task { [weak self] in
+                let ready = await self?.speech?.ensureAssetsReady() ?? false
+                self?.readiness.speechReady = ready
+            }
+        }
+        refreshReadiness()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
