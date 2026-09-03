@@ -43,16 +43,38 @@ public final class PasteInserter: TextInserter {
         pasteboard.setString(text, forType: .string)
         pasteboard.setData(Data(), forType: Self.transientType)
         pasteboard.setData(Data(), forType: Self.concealedType)
+        // The change count that identifies *our* clipboard write. If anything bumps it past this
+        // (the user copying something during the paste window), we must not clobber their newer value.
+        let ourChangeCount = pasteboard.changeCount
 
-        // 3. Synthesize ⌘V into the focused app.
-        postCommandV()
+        // 3. Synthesize ⌘V into the focused app. A failure here must be observable — never report a
+        //    successful insertion when the keystroke was never posted.
+        do {
+            try postCommandV()
+        } catch {
+            // The paste never happened — put the user's clipboard back immediately (if untouched).
+            restore(saved, into: pasteboard, ifChangeCountIs: ourChangeCount)
+            throw error
+        }
 
-        // 4. Restore the user's clipboard after the paste has been consumed.
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreDelay) {
-            pasteboard.clearContents()
-            if !saved.isEmpty {
-                pasteboard.writeObjects(saved)
-            }
+        // 4. Restore the user's clipboard after the paste has been consumed — but ONLY if it's still
+        //    our value. A paste is a READ and never bumps changeCount, so an unchanged count means no
+        //    one else wrote in the meantime; a changed count means the user copied something new,
+        //    which we leave intact (audit P0 · DATA — never overwrite the user's clipboard).
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.restoreDelay) { [self] in
+            restore(saved, into: pasteboard, ifChangeCountIs: ourChangeCount)
+        }
+    }
+
+    /// Restores `saved` only when the pasteboard's change count still matches our write.
+    private func restore(_ saved: [NSPasteboardItem], into pasteboard: NSPasteboard, ifChangeCountIs expected: Int) {
+        guard pasteboard.changeCount == expected else {
+            Log.info("clipboard changed during paste — leaving the user's newer clipboard intact")
+            return
+        }
+        pasteboard.clearContents()
+        if !saved.isEmpty {
+            pasteboard.writeObjects(saved)
         }
     }
 
@@ -70,8 +92,9 @@ public final class PasteInserter: TextInserter {
         }
     }
 
-    /// Posts a ⌘V key-down/up pair to the session event tap.
-    private func postCommandV() {
+    /// Posts a ⌘V key-down/up pair to the session event tap. Throws if the events can't be created,
+    /// so a failed paste surfaces as an error instead of being silently reported as success.
+    private func postCommandV() throws {
         // `.combinedSessionState` reads the live modifier/keyboard state of the login session,
         // which makes the synthetic keystroke land in the frontmost app's focused field.
         let source = CGEventSource(stateID: .combinedSessionState)
@@ -79,7 +102,9 @@ public final class PasteInserter: TextInserter {
         guard
             let keyDown = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: true),
             let keyUp = CGEvent(keyboardEventSource: source, virtualKey: Self.vKeyCode, keyDown: false)
-        else { return }
+        else {
+            throw KeyVoiceError.insertionFailed("could not synthesize the paste keystroke")
+        }
 
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand

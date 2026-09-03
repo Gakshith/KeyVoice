@@ -8,6 +8,7 @@ public enum KeyVoiceError: LocalizedError {
     case microphoneBusy
     case transcriptionAssetsMissing
     case transcriptionFailed(String)
+    case insertionFailed(String)
     case apiKeyMissing
     case apiKeyInvalid
 
@@ -19,6 +20,7 @@ public enum KeyVoiceError: LocalizedError {
         case .microphoneBusy:           return "The microphone is in use by another app."
         case .transcriptionAssetsMissing: return "Speech model isn't installed yet — downloading or falling back."
         case .transcriptionFailed(let m): return "Transcription failed: \(m)"
+        case .insertionFailed(let m):   return "Couldn’t insert the text: \(m)"
         case .apiKeyMissing:            return "Add your Anthropic API key in Settings to enable cleanup."
         case .apiKeyInvalid:            return "The Anthropic API key was rejected — check it in Settings."
         }

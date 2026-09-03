@@ -45,6 +45,9 @@ public final class Coordinator {
     private var lockedTarget: Target?
     private var isRecording = false
     private var runTask: Task<Void, Never>?
+    /// Monotonic id of the current dictation. The async tail checks it against `self.session` after
+    /// every await, so a superseded run can never insert text or clear newer state (audit P0 · CORE).
+    private var session = 0
 
     public init(
         hotkey: HotkeyMonitoring,
@@ -90,12 +93,17 @@ public final class Coordinator {
     }
 
     private func beginRecording() {
-        // A new dictation supersedes any run still finishing.
+        // A new dictation supersedes any run still finishing. Tear the old one down deterministically
+        // so a lingering audio/transcriber session can't feed or clear the new one (audit P0 · CORE).
+        session &+= 1
         runTask?.cancel()
         runTask = nil
+        if isRecording { audio.stop() }
+        transcriber.cancelSession()          // idempotent — ends any in-flight engine session
 
         guard let target = targets.currentTarget() else {
             // No editable field focused → do nothing, but say so (never a silent no-op).
+            // (Phase 2 diverts this to the no-target scratchpad instead of skipping.)
             emit(.skippedNoSpeech)
             Log.info("begin ignored: no focused text field")
             return
@@ -106,7 +114,7 @@ public final class Coordinator {
             try audio.start()
             isRecording = true
             emit(.listening)
-            Log.info("recording → \(target.appName) (\(target.bundleId))")
+            Log.info("recording → \(target.appName) (\(target.bundleId)) [session \(session)]")
         } catch {
             isRecording = false
             surface(error)
@@ -131,17 +139,19 @@ public final class Coordinator {
 
         lastHoldDuration = held
         emit(.thinking)
+        let mySession = session
         runTask = Task { [weak self] in
-            await self?.finishPipeline(target: target)
+            await self?.finishPipeline(target: target, session: mySession)
         }
     }
 
     // MARK: - Async tail: finalize → clean → verify → paste
 
-    private func finishPipeline(target: Target) async {
+    private func finishPipeline(target: Target, session mySession: Int) async {
         do {
             let raw = try await transcriber.finishSession()
-            if Task.isCancelled { return }
+            // A newer dictation started while we were transcribing → this run is stale; drop it.
+            guard mySession == session, !Task.isCancelled else { return }
 
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard trimmed.count >= config.minTranscriptChars else {
@@ -150,18 +160,26 @@ public final class Coordinator {
                 return
             }
 
-            // Cleanup with a length-aware deadline; nil ⇒ paste raw (never block the user).
-            let deadline = config.cleanupDeadline(forCharacters: trimmed.count)
-            // Resolve the user's per-app style (on the main actor) and carry it into the cleaner.
+            // Resolve the user's per-app style. A Verbatim style bypasses cleanup entirely
+            // (audit R-2) — a cleaner must never rewrite text the user asked to keep verbatim.
             let styleHint = styleProvider?(target.bundleId)
-            let translateTo = languageProvider?()
-            let ctx = AppContext(bundleId: target.bundleId, appName: target.appName,
-                                 styleHint: styleHint, translateTo: translateTo)
-            let cleaned = await withDeadline(deadline) { [cleaner] in
-                await cleaner.clean(trimmed, app: ctx)
-            } ?? nil
+            let isVerbatim = styleHint?.caseInsensitiveCompare("verbatim") == .orderedSame
 
-            if Task.isCancelled { return }
+            let cleaned: String?
+            if isVerbatim {
+                cleaned = nil
+            } else {
+                // Cleanup with a length-aware deadline; nil ⇒ paste raw (never block the user).
+                let deadline = config.cleanupDeadline(forCharacters: trimmed.count)
+                let translateTo = languageProvider?()
+                let ctx = AppContext(bundleId: target.bundleId, appName: target.appName,
+                                     styleHint: styleHint, translateTo: translateTo)
+                cleaned = await withDeadline(deadline) { [cleaner] in
+                    await cleaner.clean(trimmed, app: ctx)
+                } ?? nil
+            }
+
+            guard mySession == session, !Task.isCancelled else { return }
             var finalText = cleaned ?? trimmed
             if let transform { finalText = transform(finalText) }   // e.g. dictionary replacements
 

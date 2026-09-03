@@ -72,7 +72,7 @@ final class StatusController {
         let token = revertToken
         DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in
             guard let self, self.revertToken == token else { return }
-            self.setSymbol("drop")
+            self.setSymbol("waveform")   // return to the neutral resting glyph (never the old drop icon)
         }
     }
 

@@ -79,6 +79,14 @@ public final class SpeechTranscriberEngine: Transcriber {
             throw KeyVoiceError.transcriptionAssetsMissing
         }
 
+        // Idempotent: deterministically end any lingering session before starting a new one, so a
+        // rapid begin→commit→begin can't leave two pipelines fighting over state (audit P0 · CORE).
+        if runTask != nil {
+            rawContinuation?.finish()
+            runTask?.cancel()
+            cleanup()
+        }
+
         let (rawStream, continuation) = AsyncStream.makeStream(of: AVAudioPCMBuffer.self)
         rawContinuation = continuation
         let locale = requestedLocale
