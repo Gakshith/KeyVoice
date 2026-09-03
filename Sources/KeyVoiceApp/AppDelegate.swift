@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey: HotkeyMonitor(config: config),
             audio: MicAudioCapture(config: config),
             transcriber: SpeechTranscriberEngine(),   // Apple on-device (macOS 26); Apple-only, no fallback
-            cleaner: ClaudeCleaner(config: config),
+            cleaner: RoutingCleaner(config: config),   // routes to the user's chosen backend, live
             inserter: PasteInserter(config: config),
             targets: AXTargetProvider(),
             config: config
@@ -74,7 +74,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Completed dictations go to local history.
         coordinator.onCompleted = { [weak store] result in store?.record(result) }
         // Apply the user's dictionary replacements to the final text.
-        coordinator.transform = { [weak store] text in store?.applyReplacements(to: text) ?? text }
+        // Final text pass: dictionary replacements, then snippet expansion.
+        coordinator.transform = { [weak store] text in
+            guard let store else { return text }
+            return store.expandSnippets(in: store.applyReplacements(to: text))
+        }
+        // Per-app writing style: look up the user's Styles rule for the frontmost app.
+        coordinator.styleProvider = { [weak store] bundleId in store?.style(forBundleId: bundleId) }
 
         self.coordinator = coordinator
         rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)

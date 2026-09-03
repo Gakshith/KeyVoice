@@ -28,8 +28,12 @@ public final class Coordinator {
     public var onCompleted: ((DictationResult) -> Void)?
 
     /// Optional final transform applied to the text just before insertion — the app shell points
-    /// this at the user's dictionary replacements.
+    /// this at the user's dictionary replacements and snippet expansions.
     public var transform: ((String) -> String)?
+
+    /// Optional per-app style lookup (bundle id → style kind). The shell points this at the user's
+    /// Styles rules; the resolved hint rides into the cleaner via `AppContext.styleHint`.
+    public var styleProvider: ((String) -> String?)?
 
     /// Hold duration of the current dictation, captured at commit, used for words-per-minute.
     private var lastHoldDuration: TimeInterval = 0
@@ -144,7 +148,10 @@ public final class Coordinator {
 
             // Cleanup with a length-aware deadline; nil ⇒ paste raw (never block the user).
             let deadline = config.cleanupDeadline(forCharacters: trimmed.count)
-            let cleaned = await withDeadline(deadline) { [cleaner, ctx = target.appContext] in
+            // Resolve the user's per-app style (on the main actor) and carry it into the cleaner.
+            let styleHint = styleProvider?(target.bundleId)
+            let ctx = AppContext(bundleId: target.bundleId, appName: target.appName, styleHint: styleHint)
+            let cleaned = await withDeadline(deadline) { [cleaner] in
                 await cleaner.clean(trimmed, app: ctx)
             } ?? nil
 

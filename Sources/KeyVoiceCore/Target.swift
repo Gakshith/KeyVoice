@@ -31,8 +31,12 @@ public struct Target {
 public struct AppContext: Sendable, Equatable {
     public let bundleId: String
     public let appName: String
-    public init(bundleId: String, appName: String) {
+    /// The user's explicit per-app writing style (e.g. "formal"), if they set one in Styles. When
+    /// present the cleaner honors it; when nil the cleaner falls back to its own app-category tone.
+    public let styleHint: String?
+    public init(bundleId: String, appName: String, styleHint: String? = nil) {
         self.bundleId = bundleId
         self.appName = appName
+        self.styleHint = styleHint
     }
 }
