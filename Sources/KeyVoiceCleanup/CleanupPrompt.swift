@@ -1,4 +1,16 @@
+import KeyVoiceCore
+
 enum CleanupPrompt {
+    /// The user message: app identity, the optional per-app style the user chose, then the transcript.
+    static func userContent(text: String, app: AppContext) -> String {
+        var s = "App: \(app.appName) (\(app.bundleId))"
+        if let hint = app.styleHint, !hint.isEmpty {
+            s += "\nRequested writing style: \(hint). Apply this register via punctuation, casing, and disfluency handling only — never add or remove words to change tone."
+        }
+        s += "\n\nTranscript:\n\(text)"
+        return s
+    }
+
     static let system = """
 You are a dictation cleanup engine inside a macOS dictation app. You receive a raw speech-to-text transcript and the identity of the app the user is currently typing into. You return a single cleaned version of that transcript, ready to be pasted at the cursor.
 

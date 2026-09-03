@@ -152,6 +152,17 @@ public final class Store {
         try? context.save()
     }
 
+    /// Expand snippet triggers found in a transcript (whole-phrase, case-insensitive). Longer
+    /// triggers first so "meeting link" wins over "meeting".
+    public func expandSnippets(in text: String) -> String {
+        var out = text
+        for snippet in snippets().sorted(by: { $0.trigger.count > $1.trigger.count })
+        where !snippet.trigger.isEmpty {
+            out = out.replacingOccurrences(of: snippet.trigger, with: snippet.expansion, options: [.caseInsensitive])
+        }
+        return out
+    }
+
     public func delete(_ snippet: Snippet) {
         context.delete(snippet)
         try? context.save()

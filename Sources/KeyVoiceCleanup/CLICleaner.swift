@@ -26,7 +26,7 @@ public final class CLICleaner: Cleaner {
             return nil
         }
 
-        let userContent = "App: \(app.appName) (\(app.bundleId))\n\nTranscript:\n\(text)"
+        let userContent = CleanupPrompt.userContent(text: text, app: app)
         let prompt = CleanupPrompt.system
             + "\n\n" + userContent
             + "\n\nReturn ONLY the cleaned text, nothing else."

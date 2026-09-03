@@ -65,7 +65,7 @@ public final class ClaudeCleaner: Cleaner {
 
     /// Builds the POST /v1/messages request. Body shape is the Anthropic Messages API.
     private func makeRequest(text: String, app: AppContext, key: String) -> URLRequest? {
-        let userContent = "App: \(app.appName) (\(app.bundleId))\n\nTranscript:\n\(text)"
+        let userContent = CleanupPrompt.userContent(text: text, app: app)
         let body: [String: Any] = [
             "model": model,
             "max_tokens": Self.maxTokens,
