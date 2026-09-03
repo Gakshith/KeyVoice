@@ -32,6 +32,23 @@ release ┘                                     └ off / slow / empty → paste
 | `KeyVoiceCleanup` | The Claude cleanup call + Keychain key storage. |
 | `KeyVoiceApp` | Menu-bar shell that wires it all into the Coordinator. |
 
+## Install (from a release)
+
+No account, no login, everything runs locally.
+
+1. Download **KeyVoice.dmg** from the [Releases](https://github.com/Gakshith/KeyVoice/releases) page.
+2. Open the DMG and drag **KeyVoice.app** onto the **Applications** folder.
+3. **First launch:** right-click KeyVoice.app → **Open** → **Open**. (A normal double-click shows
+   *"unidentified developer"* because the app is self-signed — this one-time right-click is how macOS
+   lets you run it anyway.)
+4. When onboarding asks, grant **Microphone**, **Accessibility**, and **Input Monitoring**.
+
+Then hold the push-to-talk key and speak. Optional cleanup (Ollama or your own Anthropic key) is
+off by default — plain dictation is transcribed on-device and never leaves your Mac.
+
+> Maintainers: build the image with `./Scripts/make-dmg.sh` and attach `build/KeyVoice.dmg` to a
+> GitHub Release.
+
 ## Build & run
 
 ```bash
