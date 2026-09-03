@@ -105,8 +105,8 @@ public struct StudioShell: View {
         case .dictation:  DictationView(store: store)
         case .history:    HistoryView(store: store)
         case .dictionary: DictionaryView(store: store)
-        case .styles:     StylesView()
-        case .snippets:   SnippetsView()
+        case .styles:     StylesView(store: store)
+        case .snippets:   SnippetsView(store: store)
         case .insights:   InsightsView(store: store)
         case .settings:   SettingsView(store: store, settings: settings, onSetAPIKey: onSetAPIKey)
         }

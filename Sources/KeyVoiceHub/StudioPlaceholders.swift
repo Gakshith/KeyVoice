@@ -1,5 +1,6 @@
 import SwiftUI
 import KeyVoiceDesign
+import KeyVoiceStore
 
 /// Warm empty-state for a screen whose data model isn't wired yet. Keeps the shell coherent while
 /// Styles and Snippets are built out.
@@ -39,6 +40,7 @@ private struct StudioComingSoon: View {
 }
 
 struct StylesView: View {
+    let store: Store
     var body: some View {
         StudioComingSoon(
             title: "Styles",
@@ -50,6 +52,7 @@ struct StylesView: View {
 }
 
 struct SnippetsView: View {
+    let store: Store
     var body: some View {
         StudioComingSoon(
             title: "Snippets",
