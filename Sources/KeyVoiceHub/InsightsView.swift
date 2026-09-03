@@ -7,66 +7,115 @@ import KeyVoiceStore
 struct InsightsView: View {
     let store: Store
 
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var stats: (words: Int, streak: Int, avgWPM: Int) = (0, 0, 0)
     @State private var dictations = 0
     @State private var bestWPM = 0
     @State private var wordsThisWeek = 0
     @State private var longestStreak = 0
     @State private var topApps: [(name: String, count: Int)] = []
-    @State private var days: [Date: Int] = [:]
+    @State private var dayInfo: [Date: DayInfo] = [:]
+
+    private enum Layout {
+        static let maxContentWidth: CGFloat = 1_120
+        static let gap: CGFloat = 16
+        static let sectionGap: CGFloat = 20
+        static let wideBreakpoint: CGFloat = 860
+        static let panelBreakpoint: CGFloat = 780
+        static let mediumBreakpoint: CGFloat = 620
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                header
-                topStats
-                panels
-                streakCard
-                privacyCounter
+        GeometryReader { proxy in
+            let outerPadding: CGFloat = proxy.size.width < 640 ? 20 : (proxy.size.width < 960 ? 24 : 32)
+            let contentWidth = min(max(proxy.size.width - outerPadding * 2, 0), Layout.maxContentWidth)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: Layout.sectionGap) {
+                    header
+                        .padding(.bottom, 4)
+                    topStats(width: contentWidth)
+                    panels(width: contentWidth)
+                    streakCard
+                    privacyCounter
+                }
+                .frame(width: contentWidth, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.top, 28)
+                .padding(.bottom, 32)
             }
-            .padding(.horizontal, 32).padding(.top, 30).padding(.bottom, 34)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear(perform: reload)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { reload() }
+        }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Insights").font(.studioSerif(30)).foregroundStyle(KeyVoiceTokens.Colors.text)
-            Text("All computed on your Mac. Nothing tracked, nothing uploaded.")
+            Text("Computed locally from your dictation history.")
                 .font(.system(size: 14.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
         }
     }
 
     // MARK: - Top stats (equal-height)
 
-    private var topStats: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 16) {
-                wpmCard
-                metricCard(value: stats.words.formatted(), label: "Words all time", sub: "\(wordsThisWeek.formatted()) this week")
-                metricCard(value: dictations.formatted(), label: "Dictations", sub: "across \(topApps.count) app\(topApps.count == 1 ? "" : "s")")
+    @ViewBuilder
+    private func topStats(width: CGFloat) -> some View {
+        if width >= Layout.wideBreakpoint {
+            let unit = (width - Layout.gap * 2) / 3.25
+            HStack(spacing: Layout.gap) {
+                wpmCard.frame(width: unit * 1.25)
+                wordsCard.frame(width: unit)
+                dictationsCard.frame(width: unit)
             }
-            VStack(spacing: 16) {
+            .frame(height: 224)
+        } else if width >= Layout.mediumBreakpoint {
+            let wpmWidth = (width - Layout.gap) * 0.52
+            HStack(spacing: Layout.gap) {
                 wpmCard
-                HStack(alignment: .top, spacing: 16) {
-                    metricCard(value: stats.words.formatted(), label: "Words all time", sub: "\(wordsThisWeek.formatted()) this week")
-                    metricCard(value: dictations.formatted(), label: "Dictations", sub: "across \(topApps.count) app\(topApps.count == 1 ? "" : "s")")
+                    .frame(width: wpmWidth, height: 264)
+                VStack(spacing: Layout.gap) {
+                    wordsCard.frame(height: 124)
+                    dictationsCard.frame(height: 124)
                 }
+                .frame(width: width - wpmWidth - Layout.gap)
+            }
+        } else {
+            VStack(spacing: Layout.gap) {
+                wpmCard.frame(height: 224)
+                HStack(spacing: Layout.gap) {
+                    wordsCard.frame(maxWidth: .infinity)
+                    dictationsCard.frame(maxWidth: .infinity)
+                }
+                .frame(height: 124)
             }
         }
+    }
+
+    private var wordsCard: some View {
+        metricCard(value: stats.words.formatted(), label: "Words all time",
+                   sub: "\(wordsThisWeek.formatted()) this week")
+    }
+
+    private var dictationsCard: some View {
+        metricCard(value: dictations.formatted(), label: "Dictations",
+                   sub: "across \(topApps.count) app\(topApps.count == 1 ? "" : "s")")
     }
 
     private var wpmCard: some View {
         StudioCard {
             VStack(alignment: .leading, spacing: 12) {
-                StudioStat(value: "\(stats.avgWPM)", unit: "wpm", label: "Average pace")
+                InsightStat(value: "\(stats.avgWPM)", unit: "wpm", label: "Average pace")
                 Spacer(minLength: 6)
                 ArcGauge(fraction: min(Double(stats.avgWPM) / 180.0, 1))
-                    .frame(height: 58).frame(maxWidth: .infinity)
+                    .frame(height: 64).frame(maxWidth: .infinity)
                 Text(bestWPM > 0 ? "Personal best \(bestWPM) wpm" : "Speak to set your pace")
                     .font(.system(size: 11.5, weight: .semibold)).tracking(0.3)
-                    .foregroundStyle(KeyVoiceTokens.Colors.fog).frame(maxWidth: .infinity)
+                    .foregroundStyle(KeyVoiceTokens.Colors.text2).frame(maxWidth: .infinity)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -77,8 +126,8 @@ struct InsightsView: View {
         StudioCard {
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
-                StudioStat(value: value, label: label)
-                Text(sub).font(.system(size: 12)).foregroundStyle(KeyVoiceTokens.Colors.fog).padding(.top, 6)
+                InsightStat(value: value, label: label)
+                Text(sub).font(.system(size: 12)).foregroundStyle(KeyVoiceTokens.Colors.text2).padding(.top, 6)
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -88,15 +137,20 @@ struct InsightsView: View {
 
     // MARK: - Panels
 
-    private var panels: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .top, spacing: 16) {
-                usageCard.frame(maxWidth: .infinity)
-                highlightsCard.frame(width: 260)
+    @ViewBuilder
+    private func panels(width: CGFloat) -> some View {
+        if width >= Layout.panelBreakpoint {
+            let highlightsWidth = min(320, width * 0.36)
+            HStack(spacing: Layout.gap) {
+                usageCard
+                    .frame(width: width - highlightsWidth - Layout.gap, height: 272)
+                highlightsCard
+                    .frame(width: highlightsWidth, height: 272)
             }
-            VStack(spacing: 16) {
-                usageCard.frame(maxWidth: .infinity)
-                highlightsCard.frame(maxWidth: .infinity)
+        } else {
+            VStack(spacing: Layout.gap) {
+                usageCard.frame(height: 272)
+                highlightsCard.frame(height: 272)
             }
         }
     }
@@ -106,46 +160,74 @@ struct InsightsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 cardTitle("Where you dictate", meta: "\(topApps.count) app\(topApps.count == 1 ? "" : "s")")
                 if topApps.isEmpty {
-                    Text("No dictations yet.").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    Text("No dictations yet.").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.text2)
                 } else {
                     let maxCount = max(topApps.first?.count ?? 1, 1)
                     ForEach(Array(topApps.enumerated()), id: \.offset) { idx, app in
                         UsageBar(label: app.name,
                                  fraction: Double(app.count) / Double(maxCount),
-                                 color: KeyVoiceTokens.Colors.spectrum[idx % KeyVoiceTokens.Colors.spectrum.count],
+                                 color: KeyVoiceTokens.Colors.accent.opacity(max(0.50, 1.0 - Double(idx) * 0.12)),
                                  value: app.count)
                     }
                 }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 
     private var highlightsCard: some View {
         StudioCard {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 14) {
                 cardTitle("Highlights", meta: "")
-                highlightRow("bolt.fill", "\(bestWPM)", "best pace (wpm)")
-                divider
-                highlightRow("calendar", "\(wordsThisWeek.formatted())", "words this week")
-                divider
-                highlightRow("flame.fill", "\(longestStreak)", "longest streak (days)")
-                divider
-                highlightRow("app.badge", "\(topApps.count)", "apps used")
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+                    highlightMetric("bolt.fill", value: "\(bestWPM)", unit: "wpm", label: "Best pace")
+                    highlightMetric("calendar", value: wordsThisWeek.formatted(), unit: "words", label: "This week")
+                    highlightMetric("flame.fill", value: "\(longestStreak)", unit: "days", label: "Longest streak")
+                    highlightMetric("app.badge", value: "\(topApps.count)", unit: "apps", label: "Apps used")
+                }
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
     }
 
-    private var divider: some View { Rectangle().fill(KeyVoiceTokens.Colors.line).frame(height: 1).padding(.vertical, 10) }
-
-    private func highlightRow(_ icon: String, _ value: String, _ label: String) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: icon).font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.accent).frame(width: 18)
-            Text(value).font(.studioSerif(20)).monospacedDigit().foregroundStyle(KeyVoiceTokens.Colors.text)
-            Text(label).font(.system(size: 12.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
-            Spacer(minLength: 0)
+    private func highlightMetric(_ icon: String, value: String, unit: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(KeyVoiceTokens.Colors.accent)
+                    .frame(width: 24, height: 24)
+                    .background(KeyVoiceTokens.Colors.accentSoft, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                Text(label)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.studioSerif(22))
+                    .monospacedDigit()
+                    .foregroundStyle(KeyVoiceTokens.Colors.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(unit)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    .lineLimit(1)
+            }
         }
+        .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
+        .background(KeyVoiceTokens.Colors.card2, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(KeyVoiceTokens.Colors.line.opacity(0.8), lineWidth: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(value) \(unit)")
     }
 
     // MARK: - Streak calendar (the centerpiece)
@@ -157,17 +239,18 @@ struct InsightsView: View {
                     Text("\(stats.streak) day streak").font(.studioSerif(24)).foregroundStyle(KeyVoiceTokens.Colors.text)
                     Spacer()
                     Text("LONGEST · \(longestStreak) DAY\(longestStreak == 1 ? "" : "S")")
-                        .font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                        .font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(KeyVoiceTokens.Colors.text2)
                 }
-                ScrollView(.horizontal, showsIndicators: false) {
-                    StreakCalendar(days: days)
+                GeometryReader { geo in
+                    StreakCalendar(dayInfo: dayInfo, availableWidth: geo.size.width)
                 }
+                .frame(height: StreakCalendar.height)
                 HStack(spacing: 6) {
-                    Text("Less").font(.system(size: 11, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    Text("Less").font(.system(size: 11, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.text2)
                     ForEach(0..<4) { l in
                         RoundedRectangle(cornerRadius: 3).fill(StreakCalendar.color(forLevel: l)).frame(width: 12, height: 12)
                     }
-                    Text("More").font(.system(size: 11, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    Text("More").font(.system(size: 11, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.text2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -175,20 +258,49 @@ struct InsightsView: View {
     }
 
     private var privacyCounter: some View {
-        StudioCard {
-            HStack(spacing: 14) {
-                Image(systemName: "lock.shield").font(.system(size: 26)).foregroundStyle(KeyVoiceTokens.Colors.good)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Your audio, sent to the cloud")
-                        .font(.system(size: 12, weight: .semibold)).tracking(0.4).foregroundStyle(KeyVoiceTokens.Colors.fog)
-                    Text("0 bytes").font(.studioSerif(30)).foregroundStyle(KeyVoiceTokens.Colors.good)
+        StudioCard(padding: 20) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 14) {
+                    privacyIcon
+                    privacyMessage
+                    Spacer(minLength: 20)
+                    Text("Cloud cleanup may send transcript text to the provider you choose.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                        .frame(maxWidth: 330, alignment: .trailing)
+                        .multilineTextAlignment(.trailing)
                 }
-                Spacer()
-                Text("Your voice is transcribed on-device and never leaves this Mac.")
-                    .font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.text2)
-                    .frame(maxWidth: 240, alignment: .trailing).multilineTextAlignment(.trailing)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 14) {
+                        privacyIcon
+                        privacyMessage
+                    }
+                    Text("Cloud cleanup may send transcript text to the provider you choose.")
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var privacyIcon: some View {
+        Image(systemName: "lock.shield.fill")
+            .font(.system(size: 21, weight: .semibold))
+            .foregroundStyle(KeyVoiceTokens.Colors.accent)
+            .frame(width: 42, height: 42)
+            .background(KeyVoiceTokens.Colors.accentSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .accessibilityHidden(true)
+    }
+
+    private var privacyMessage: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Audio stays on this Mac")
+                .font(.studioSerif(19))
+                .foregroundStyle(KeyVoiceTokens.Colors.text)
+            Text("Transcription and these insights are computed on-device.")
+                .font(.system(size: 12.5))
+                .foregroundStyle(KeyVoiceTokens.Colors.text2)
         }
     }
 
@@ -197,7 +309,7 @@ struct InsightsView: View {
             Text(title).font(.studioSerif(22)).foregroundStyle(KeyVoiceTokens.Colors.text)
             Spacer()
             if !meta.isEmpty {
-                Text(meta.uppercased()).font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                Text(meta.uppercased()).font(.system(size: 11, weight: .bold)).tracking(0.6).foregroundStyle(KeyVoiceTokens.Colors.text2)
             }
         }
     }
@@ -216,9 +328,16 @@ struct InsightsView: View {
             .map { (name: $0.key, count: $0.value.count) }
             .sorted { $0.count > $1.count }
             .prefix(5).map { $0 }
-        let dayCounts = Dictionary(grouping: all, by: { cal.startOfDay(for: $0.date) }).mapValues { $0.count }
-        days = dayCounts
-        longestStreak = Self.longestRun(of: Set(dayCounts.keys))
+        let byDay = Dictionary(grouping: all, by: { cal.startOfDay(for: $0.date) })
+        dayInfo = byDay.mapValues { items in
+            let topApp = Dictionary(grouping: items, by: { $0.appName })
+                .max { $0.value.count < $1.value.count }?.key ?? "—"
+            return DayInfo(count: items.count,
+                           words: items.reduce(0) { $0 + $1.wordCount },
+                           apps: Set(items.map { $0.appName }).count,
+                           topApp: topApp)
+        }
+        longestStreak = Self.longestRun(of: Set(byDay.keys))
     }
 
     /// Longest run of consecutive calendar days present in the set.
@@ -239,6 +358,42 @@ struct InsightsView: View {
 }
 
 // MARK: - Insights primitives
+
+/// Insights uses a darker secondary tone than the shared stat so small labels clear WCAG contrast.
+private struct InsightStat: View {
+    let value: String
+    var unit: String?
+    let label: String
+
+    init(value: String, unit: String? = nil, label: String) {
+        self.value = value
+        self.unit = unit
+        self.label = label
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(value)
+                    .font(.studioSerif(36))
+                    .monospacedDigit()
+                    .foregroundStyle(KeyVoiceTokens.Colors.text)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                if let unit {
+                    Text(unit)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                }
+            }
+            Text(label.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.4)
+                .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                .lineLimit(1)
+        }
+    }
+}
 
 /// A semicircular gauge filled along the voice spectrum.
 private struct ArcGauge: View {
@@ -271,7 +426,8 @@ private struct UsageBar: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(label).font(.system(size: 13, weight: .medium)).foregroundStyle(KeyVoiceTokens.Colors.text2)
-                .frame(width: 96, alignment: .leading).lineLimit(1)
+                .frame(width: 112, alignment: .leading).lineLimit(1)
+                .help(label)
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(KeyVoiceTokens.Colors.paper2)
@@ -280,21 +436,41 @@ private struct UsageBar: View {
             }
             .frame(height: 22)
             Text("\(value)").font(.system(size: 12.5, weight: .semibold)).monospacedDigit()
-                .foregroundStyle(KeyVoiceTokens.Colors.fog).frame(width: 34, alignment: .trailing)
+                .foregroundStyle(KeyVoiceTokens.Colors.text2).frame(width: 34, alignment: .trailing)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+        .accessibilityValue("\(value) dictation\(value == 1 ? "" : "s")")
     }
 }
 
 /// A GitHub/Wispr-style activity calendar: weekday rows × week columns, month labels on top, colored
-/// by daily dictation count. Last ~20 weeks.
+/// by daily dictation count. The column count adapts to the available width so the grid always fills
+/// its card. Click any past day for a detail popover.
 private struct StreakCalendar: View {
-    let days: [Date: Int]
-    private let weeks = 20
-    private let cell: CGFloat = 13
-    private let gap: CGFloat = 3
+    let dayInfo: [Date: DayInfo]
+    /// Width offered by the parent; the number of week columns is derived from it.
+    let availableWidth: CGFloat
+
+    private let cell: CGFloat = 14
+    private let gap: CGFloat = 10
+    private let labelColumn: CGFloat = 30           // weekday labels + the HStack spacing
+    private let labelRow: CGFloat = 14              // month-label strip above the grid
     private static let weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
+    /// Fixed height of the whole calendar — lets the GeometryReader parent reserve exact space.
+    static let height: CGFloat = 14 /* label row */ + 7 * 24 /* accessible hit target */
+
+    @State private var selected: Date?
     private let cal = Calendar.current
+
+    /// Columns that fit the available width, clamped to a sane range (a few weeks … one year).
+    private var weeks: Int {
+        let usable = max(0, availableWidth - labelColumn)
+        let fit = Int(floor(usable / (cell + gap)))
+        return min(53, max(12, fit))
+    }
+
     private var startDate: Date {
         let thisWeekStart = cal.dateInterval(of: .weekOfYear, for: Date())?.start ?? cal.startOfDay(for: Date())
         return cal.date(byAdding: .day, value: -7 * (weeks - 1), to: thisWeekStart) ?? thisWeekStart
@@ -321,35 +497,72 @@ private struct StreakCalendar: View {
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Weekday labels, aligned under the month-label row.
-            VStack(alignment: .leading, spacing: gap) {
-                Color.clear.frame(height: 14)
+            VStack(alignment: .leading, spacing: 0) {
+                Color.clear.frame(height: labelRow)
                 ForEach(Self.weekdayLabels, id: \.self) { d in
-                    Text(d).font(.system(size: 9, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.fog)
-                        .frame(height: cell, alignment: .center)
+                    Text(d).font(.system(size: 9, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.text2)
+                        .frame(width: 22, height: cell + gap, alignment: .leading)
                 }
             }
             VStack(alignment: .leading, spacing: 0) {
                 // Month labels overlaid so they never shift the columns.
                 ZStack(alignment: .topLeading) {
-                    Color.clear.frame(height: 14)
+                    Color.clear.frame(height: labelRow)
                     ForEach(monthMarkers, id: \.week) { m in
                         Text(m.name).font(.system(size: 10, weight: .semibold)).foregroundStyle(KeyVoiceTokens.Colors.text2)
                             .fixedSize().offset(x: CGFloat(m.week) * (cell + gap))
                     }
                 }
                 // 7 weekday rows × N week columns.
-                VStack(spacing: gap) {
+                VStack(spacing: 0) {
                     ForEach(0..<7, id: \.self) { d in
-                        HStack(spacing: gap) {
+                        HStack(spacing: 0) {
                             ForEach(0..<weeks, id: \.self) { w in
-                                let day = date(week: w, weekday: d)
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(day > Date() ? Color.clear : Self.color(forLevel: Self.level(count: days[cal.startOfDay(for: day)] ?? 0)))
-                                    .frame(width: cell, height: cell)
+                                cellView(week: w, weekday: d)
                             }
                         }
                     }
                 }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cellView(week: Int, weekday: Int) -> some View {
+        let day = cal.startOfDay(for: date(week: week, weekday: weekday))
+        let isFuture = day > Date()
+        let info = dayInfo[day]
+        let count = info?.count ?? 0
+        if isFuture || count == 0 {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(isFuture ? Color.clear : Self.color(forLevel: Self.level(count: count)))
+                .frame(width: cell, height: cell)
+                .frame(width: cell + gap, height: cell + gap)
+                .accessibilityHidden(true)
+        } else {
+            Button {
+                selected = day
+            } label: {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Self.color(forLevel: Self.level(count: count)))
+                    .frame(width: cell, height: cell)
+                    .overlay {
+                        if selected == day {
+                            RoundedRectangle(cornerRadius: 3)
+                                .strokeBorder(KeyVoiceTokens.Colors.text, lineWidth: 1.5)
+                        }
+                    }
+            }
+            .frame(width: cell + gap, height: cell + gap)
+            .buttonStyle(.plain)
+            .accessibilityLabel(day.formatted(.dateTime.weekday(.wide).month(.wide).day()))
+            .accessibilityValue("\(count) dictation\(count == 1 ? "" : "s"), \(info?.words ?? 0) words")
+            .help("\(count) dictation\(count == 1 ? "" : "s")")
+            .popover(isPresented: Binding(get: { selected == day },
+                                          set: { if !$0 { selected = nil } }),
+                     arrowEdge: .top) {
+                DayDetailCard(day: day, info: info)
             }
         }
     }
@@ -370,5 +583,99 @@ private struct StreakCalendar: View {
         case 3: return KeyVoiceTokens.Colors.accent
         default: return KeyVoiceTokens.Colors.paper2
         }
+    }
+}
+
+/// One day's locally-computed activity — every field traces to real transcripts, nothing invented.
+private struct DayInfo {
+    let count: Int
+    let words: Int
+    let apps: Int
+    let topApp: String
+}
+
+/// The detail popover shown when a calendar day is clicked.
+private struct DayDetailCard: View {
+    let day: Date
+    let info: DayInfo?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(day.formatted(.dateTime.weekday(.wide)))
+                        .font(.studioSerif(18))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text)
+                    Text(day.formatted(.dateTime.month(.wide).day()))
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(KeyVoiceTokens.Colors.accent)
+                    .frame(width: 30, height: 30)
+                    .background(KeyVoiceTokens.Colors.accentSoft, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+
+            if let info, info.count > 0 {
+                HStack(spacing: 0) {
+                    dayMetric("Dictations", "\(info.count)")
+                    dayMetric("Words", info.words.formatted())
+                    dayMetric("Apps", "\(info.apps)")
+                }
+                .padding(.vertical, 11)
+                .background(KeyVoiceTokens.Colors.card2, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                        .strokeBorder(KeyVoiceTokens.Colors.line.opacity(0.8), lineWidth: 1)
+                }
+
+                HStack(spacing: 8) {
+                    Image(systemName: "app.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(KeyVoiceTokens.Colors.accent)
+                    Text("Top app")
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                    Spacer(minLength: 8)
+                    Text(info.topApp)
+                        .font(.system(size: 11.5, weight: .semibold))
+                        .foregroundStyle(KeyVoiceTokens.Colors.text)
+                        .lineLimit(1)
+                }
+            } else {
+                Label("No dictations this day", systemImage: "waveform")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(KeyVoiceTokens.Colors.text2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(KeyVoiceTokens.Colors.card2, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            }
+        }
+        .padding(18)
+        .frame(width: 250, alignment: .leading)
+        .background(KeyVoiceTokens.Colors.card)
+        .presentationBackground(KeyVoiceTokens.Colors.card)
+        .environment(\.colorScheme, .light)
+    }
+
+    private func dayMetric(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 3) {
+            Text(value)
+                .font(.studioSerif(18))
+                .monospacedDigit()
+                .foregroundStyle(KeyVoiceTokens.Colors.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(label.uppercased())
+                .font(.system(size: 8.5, weight: .bold))
+                .tracking(0.35)
+                .foregroundStyle(KeyVoiceTokens.Colors.fog)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), \(value)")
     }
 }
