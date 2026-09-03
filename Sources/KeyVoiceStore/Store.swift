@@ -155,12 +155,11 @@ public final class Store {
     /// Expand snippet triggers found in a transcript (whole-phrase, case-insensitive). Longer
     /// triggers first so "meeting link" wins over "meeting".
     public func expandSnippets(in text: String) -> String {
-        var out = text
-        for snippet in snippets().sorted(by: { $0.trigger.count > $1.trigger.count })
-        where !snippet.trigger.isEmpty {
-            out = out.replacingOccurrences(of: snippet.trigger, with: snippet.expansion, options: [.caseInsensitive])
-        }
-        return out
+        let rules = snippets()
+            .sorted(by: { $0.trigger.count > $1.trigger.count })
+            .filter { !$0.trigger.isEmpty }
+            .map { (from: $0.trigger, to: $0.expansion) }
+        return BoundaryReplacer.apply(rules, to: text)
     }
 
     public func delete(_ snippet: Snippet) {
@@ -171,14 +170,9 @@ public final class Store {
     /// Apply the user's replacements to a transcript (whole-word, case-insensitive). Used as a
     /// post-transcription pass so taught names/acronyms come out right even before Claude cleanup.
     public func applyReplacements(to text: String) -> String {
-        var out = text
-        for entry in dictionaryEntries() where !entry.from.isEmpty {
-            out = out.replacingOccurrences(
-                of: entry.from,
-                with: entry.to,
-                options: [.caseInsensitive]
-            )
-        }
-        return out
+        let rules = dictionaryEntries()
+            .filter { !$0.from.isEmpty }
+            .map { (from: $0.from, to: $0.to) }
+        return BoundaryReplacer.apply(rules, to: text)
     }
 }
