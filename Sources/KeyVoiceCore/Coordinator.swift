@@ -39,6 +39,11 @@ public final class Coordinator {
     /// translation setting; rides into the cleaner via `AppContext.translateTo`.
     public var languageProvider: (() -> String?)?
 
+    /// Called with the finalized text when there was no valid destination to paste into — no editable
+    /// field at the start, or the target went away before insertion. The app shell shows the no-target
+    /// scratchpad so the words are never lost or pasted into the wrong place (NEW-2 / P0 · DATA).
+    public var onNoTarget: ((String) -> Void)?
+
     /// Hold duration of the current dictation, captured at commit, used for words-per-minute.
     private var lastHoldDuration: TimeInterval = 0
 
@@ -101,20 +106,26 @@ public final class Coordinator {
         if isRecording { audio.stop() }
         transcriber.cancelSession()          // idempotent — ends any in-flight engine session
 
-        guard let target = targets.currentTarget() else {
-            // No editable field focused → do nothing, but say so (never a silent no-op).
-            // (Phase 2 diverts this to the no-target scratchpad instead of skipping.)
+        // Never capture from a secure/password field — that text is neither shown nor stored.
+        if targets.isSecureFieldFocused() {
             emit(.skippedNoSpeech)
-            Log.info("begin ignored: no focused text field")
+            Log.info("begin ignored: secure field focused")
             return
         }
-        lockedTarget = target
+
+        // Capture the target if there is one. nil is fine: on release, the text goes to the
+        // no-target scratchpad instead of being pasted (never a silent no-op, never a wrong paste).
+        lockedTarget = targets.currentTarget()
         do {
             try transcriber.beginSession()
             try audio.start()
             isRecording = true
             emit(.listening)
-            Log.info("recording → \(target.appName) (\(target.bundleId)) [session \(session)]")
+            if let t = lockedTarget {
+                Log.info("recording → \(t.appName) (\(t.bundleId)) [session \(session)]")
+            } else {
+                Log.info("recording → no target, will use scratchpad [session \(session)]")
+            }
         } catch {
             isRecording = false
             surface(error)
@@ -135,11 +146,11 @@ public final class Coordinator {
         guard isRecording else { return }
         isRecording = false
         audio.stop()
-        guard let target = lockedTarget else { emit(.idle); return }
 
         lastHoldDuration = held
         emit(.thinking)
         let mySession = session
+        let target = lockedTarget        // may be nil → scratchpad on finish
         runTask = Task { [weak self] in
             await self?.finishPipeline(target: target, session: mySession)
         }
@@ -147,7 +158,7 @@ public final class Coordinator {
 
     // MARK: - Async tail: finalize → clean → verify → paste
 
-    private func finishPipeline(target: Target, session mySession: Int) async {
+    private func finishPipeline(target: Target?, session mySession: Int) async {
         do {
             let raw = try await transcriber.finishSession()
             // A newer dictation started while we were transcribing → this run is stale; drop it.
@@ -160,9 +171,9 @@ public final class Coordinator {
                 return
             }
 
-            // Resolve the user's per-app style. A Verbatim style bypasses cleanup entirely
-            // (audit R-2) — a cleaner must never rewrite text the user asked to keep verbatim.
-            let styleHint = styleProvider?(target.bundleId)
+            // Resolve the user's per-app style (only meaningful with a target). A Verbatim style
+            // bypasses cleanup entirely (audit R-2) — never rewrite text the user asked to keep as-is.
+            let styleHint = target.flatMap { styleProvider?($0.bundleId) }
             let isVerbatim = styleHint?.caseInsensitiveCompare("verbatim") == .orderedSame
 
             let cleaned: String?
@@ -172,7 +183,7 @@ public final class Coordinator {
                 // Cleanup with a length-aware deadline; nil ⇒ paste raw (never block the user).
                 let deadline = config.cleanupDeadline(forCharacters: trimmed.count)
                 let translateTo = languageProvider?()
-                let ctx = AppContext(bundleId: target.bundleId, appName: target.appName,
+                let ctx = AppContext(bundleId: target?.bundleId ?? "", appName: target?.appName ?? "",
                                      styleHint: styleHint, translateTo: translateTo)
                 cleaned = await withDeadline(deadline) { [cleaner] in
                     await cleaner.clean(trimmed, app: ctx)
@@ -183,17 +194,21 @@ public final class Coordinator {
             var finalText = cleaned ?? trimmed
             if let transform { finalText = transform(finalText) }   // e.g. dictionary replacements
 
-            // Re-verify the caret is still where we started — refuse to paste into a stranger.
-            guard targets.stillValid(target) else {
-                emit(.abortedTargetLost)
-                Log.warn("target moved; refused paste into wrong window")
-                return
+            // Route: paste into a target we can still prove, otherwise hand the text to the no-target
+            // scratchpad — fail closed, never guess a destination (NEW-2 / P0 · DATA).
+            if let target, targets.stillValid(target) {
+                try inserter.insert(finalText, into: target)
+                emit(cleaned == nil ? .insertedRaw : .inserted)
+                onCompleted?(DictationResult(text: finalText, app: target.appContext, duration: lastHoldDuration))
+                Log.info("pasted \(finalText.count) chars (\(cleaned == nil ? "raw" : "cleaned"))")
+            } else {
+                onNoTarget?(finalText)
+                emit(.capturedNoTarget)
+                onCompleted?(DictationResult(text: finalText,
+                                             app: AppContext(bundleId: "", appName: "No destination"),
+                                             duration: lastHoldDuration))
+                Log.info("no target → scratchpad (\(finalText.count) chars)")
             }
-
-            try inserter.insert(finalText, into: target)
-            emit(cleaned == nil ? .insertedRaw : .inserted)
-            onCompleted?(DictationResult(text: finalText, app: target.appContext, duration: lastHoldDuration))
-            Log.info("pasted \(finalText.count) chars (\(cleaned == nil ? "raw" : "cleaned"))")
         } catch {
             surface(error)
         }

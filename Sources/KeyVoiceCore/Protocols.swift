@@ -34,6 +34,9 @@ public protocol TargetProvider {
     func currentTarget() -> Target?
     /// True if `target` is still the frontmost/focused destination (safe to paste).
     func stillValid(_ target: Target) -> Bool
+    /// True if the focused element is a secure/password field. Such fields are never captured —
+    /// their transcript is neither shown in the scratchpad nor recorded to history.
+    func isSecureFieldFocused() -> Bool
 }
 
 /// The global push-to-talk key. Emits begin/commit/cancel; never blocks normal typing.

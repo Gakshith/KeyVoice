@@ -55,6 +55,14 @@ public final class AXTargetProvider: TargetProvider {
         )
     }
 
+    public func isSecureFieldFocused() -> Bool {
+        guard ensureTrusted(), let focused = copyFocusedElement() else { return false }
+        let role = copyStringAttribute(focused, kAXRoleAttribute as CFString)
+        let subrole = copyStringAttribute(focused, kAXSubroleAttribute as CFString)
+        // Native secure fields report either the AXSecureTextField role or subrole.
+        return role == "AXSecureTextField" || subrole == (kAXSecureTextFieldSubrole as String)
+    }
+
     public func stillValid(_ target: Target) -> Bool {
         // Hard gate: the frontmost app must still be the one we captured.
         guard let app = NSWorkspace.shared.frontmostApplication else { return false }

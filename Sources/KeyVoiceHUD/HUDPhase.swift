@@ -26,6 +26,7 @@ public enum HUDPhase: Equatable {
         case .listening:                         return .listening
         case .thinking:                          return .thinking
         case .inserted, .insertedRaw:            return .done(streak: true)
+        case .capturedNoTarget:                  return .done(streak: false)   // saved to the scratchpad
         case .skippedNoSpeech, .abortedTargetLost, .error:
                                                  return .deflate
         }

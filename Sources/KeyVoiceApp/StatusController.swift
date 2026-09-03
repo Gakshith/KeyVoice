@@ -56,7 +56,7 @@ final class StatusController {
             setSymbol("waveform.circle.fill")
         case .thinking:
             setSymbol("waveform.circle.fill")
-        case .inserted, .insertedRaw:
+        case .inserted, .insertedRaw, .capturedNoTarget:
             setSymbol("checkmark.circle")
             scheduleRevert(after: 1.0)
         case .skippedNoSpeech, .abortedTargetLost:

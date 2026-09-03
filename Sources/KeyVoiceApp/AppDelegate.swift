@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var status: StatusController?
     private var hud: HUDController?
     private var caption: CaptionController?
+    private var scratchpad: ScratchpadController?
     private var levelMeter: AudioLevelMeter?
     private var store: Store?
     private var settings: SettingsStore?
@@ -57,10 +58,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         let hud = HUDController(config: config)
         let caption = CaptionController()
+        let scratchpad = ScratchpadController()
         let levelMeter = AudioLevelMeter()
         self.status = status
         self.hud = hud
         self.caption = caption
+        self.scratchpad = scratchpad
         self.levelMeter = levelMeter
 
         // Apple on-device streaming transcriber (macOS 26). Hoisted so we can hook its live partials.
@@ -84,11 +87,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         // Status fans out to the menu bar always, and to the HUD only if the user keeps it on.
-        coordinator.onStatus = { [weak status, weak hud, weak caption, weak settings] s in
+        coordinator.onStatus = { [weak status, weak hud, weak caption, weak scratchpad, weak settings] s in
             status?.update(s)
             let hudOn = settings?.showHUD ?? true
             hud?.update(hudOn ? s : .idle)
             caption?.update(hudOn ? s : .idle)
+            if s == .listening { scratchpad?.hide() }   // a new dictation started — clear the last capture
             if (s == .inserted || s == .insertedRaw), settings?.soundEnabled == true {
                 NSSound(named: "Tink")?.play()   // subtle confirmation when text lands
             }
@@ -111,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let lang = settings?.targetLanguage, lang != "off", !lang.isEmpty else { return nil }
             return lang
         }
+        // No editable field focused (or the target went away) → show the captured text in the
+        // scratchpad with a Copy button, instead of losing it or pasting into the wrong place.
+        coordinator.onNoTarget = { [weak scratchpad] text in scratchpad?.show(text) }
 
         self.coordinator = coordinator
         rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)
