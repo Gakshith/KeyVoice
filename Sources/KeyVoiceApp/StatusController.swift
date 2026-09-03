@@ -2,7 +2,8 @@ import AppKit
 import KeyVoiceCore
 import KeyVoiceCleanup
 
-/// The menu-bar icon. A single quiet, monochrome SF Symbol microphone that reflects pipeline state,
+/// The menu-bar icon. A single quiet, monochrome SF Symbol waveform (matching the app's keycap-wave
+/// mark) that reflects pipeline state,
 /// plus the app's quick actions (open the Hub, permissions, API key, quit).
 @MainActor
 final class StatusController {
@@ -18,7 +19,7 @@ final class StatusController {
         self.onOpenHub = onOpenHub
         self.onPermissions = onPermissions
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        setSymbol("drop")
+        setSymbol("waveform")
 
         let menu = NSMenu()
         let titleItem = NSMenuItem(title: "KeyVoice", action: nil, keyEquivalent: "")
@@ -48,11 +49,11 @@ final class StatusController {
 
         switch status {
         case .idle:
-            setSymbol("drop")
+            setSymbol("waveform")
         case .listening:
-            setSymbol("drop.fill")
+            setSymbol("waveform.circle.fill")
         case .thinking:
-            setSymbol("drop.fill")
+            setSymbol("waveform.circle.fill")
         case .inserted, .insertedRaw:
             setSymbol("checkmark.circle")
             scheduleRevert(after: 1.0)
