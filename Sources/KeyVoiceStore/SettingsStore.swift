@@ -23,12 +23,11 @@ public final class SettingsStore {
 
     // MARK: - Cleanup model
 
-    /// Which backend polishes transcripts: "off" (raw, most private), "ollama", "cli", "claude".
+    /// Which backend polishes transcripts: "off" (raw, most private), "ollama", "claude". The old
+    /// "cli" provider was removed for security (audit P0) and is migrated to "off" on launch.
     public var cleanupProvider: String { didSet { defaults.set(cleanupProvider, forKey: "cleanupProvider") } }
     /// The Ollama model name to use when cleanupProvider == "ollama".
     public var ollamaModel: String? { didSet { defaults.set(ollamaModel, forKey: "ollamaModel") } }
-    /// The installed CLI to use when cleanupProvider == "cli": "claude", "codex", or "gemini".
-    public var cliTool: String { didSet { defaults.set(cliTool, forKey: "cliTool") } }
     /// Language to translate cleaned text into (e.g. "Spanish"), or "off". Needs a cleanup tier.
     public var targetLanguage: String { didSet { defaults.set(targetLanguage, forKey: "targetLanguage") } }
 
@@ -40,9 +39,16 @@ public final class SettingsStore {
         showHUD         = defaults.object(forKey: "showHUD") as? Bool ?? true
         soundEnabled    = defaults.object(forKey: "soundEnabled") as? Bool ?? false
         needsOnboarding = defaults.object(forKey: "needsOnboarding") as? Bool ?? true
-        cleanupProvider = defaults.string(forKey: "cleanupProvider") ?? "off"
+        // Migrate away from the removed CLI cleanup provider (audit P0 · SECURITY) → default it Off.
+        let savedProvider = defaults.string(forKey: "cleanupProvider") ?? "off"
+        cleanupProvider = (savedProvider == "cli") ? "off" : savedProvider
         ollamaModel     = defaults.string(forKey: "ollamaModel")
-        cliTool         = defaults.string(forKey: "cliTool") ?? "claude"
         targetLanguage  = defaults.string(forKey: "targetLanguage") ?? "off"
+
+        // Property observers don't fire during init, so persist the migration explicitly.
+        if savedProvider == "cli" {
+            defaults.set("off", forKey: "cleanupProvider")
+            defaults.removeObject(forKey: "cliTool")
+        }
     }
 }

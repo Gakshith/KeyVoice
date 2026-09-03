@@ -14,7 +14,6 @@ struct SettingsView: View {
     let onSetAPIKey: () -> Void
 
     @State private var ollamaModels: [String] = []
-    @State private var detectedTools: [CLITool] = []
 
     var body: some View {
         ScrollView {
@@ -54,7 +53,6 @@ struct SettingsView: View {
                         Picker("", selection: cleanupProviderBinding) {
                             Text("Off — raw").tag("off")
                             Text("On-device · Ollama").tag("ollama")
-                            Text("Installed CLI").tag("cli")
                             Text("Claude API key").tag("claude")
                         }
                         .labelsHidden().frame(maxWidth: 210)
@@ -71,21 +69,6 @@ struct SettingsView: View {
                                 }.labelsHidden().frame(maxWidth: 210)
                             }
                         }
-                        SettingsRow("") { Button("Refresh detection", action: detect).buttonStyle(.plain).foregroundStyle(KeyVoiceTokens.Colors.accent) }
-                    }
-
-                    if settings.cleanupProvider == "cli" {
-                        Divider().overlay(KeyVoiceTokens.Colors.line)
-                        if detectedTools.isEmpty {
-                            SettingsNote("No CLI found (claude, codex, gemini). Install one, then Refresh.")
-                        } else {
-                            SettingsRow("Tool") {
-                                Picker("", selection: cliToolBinding) {
-                                    ForEach(detectedTools, id: \.self) { Text($0.rawValue).tag($0.rawValue) }
-                                }.labelsHidden().frame(maxWidth: 210)
-                            }
-                        }
-                        SettingsNote("Experimental — reuses a CLI you're already signed into. Slower than Ollama.")
                         SettingsRow("") { Button("Refresh detection", action: detect).buttonStyle(.plain).foregroundStyle(KeyVoiceTokens.Colors.accent) }
                     }
 
@@ -107,7 +90,7 @@ struct SettingsView: View {
                     }
 
                     Divider().overlay(KeyVoiceTokens.Colors.line)
-                    SettingsNote("🔒 Your audio is always transcribed on-device. Only Claude / CLI text-cleanup leaves this Mac.")
+                    SettingsNote("🔒 Your audio is always transcribed on-device. Only Claude text-cleanup (if you turn it on) leaves this Mac.")
                 }
 
                 SettingsGroup("Data") {
@@ -157,14 +140,12 @@ struct SettingsView: View {
     private var hotKeyBinding: Binding<Int> { Binding(get: { settings.hotKeyCode }, set: { settings.hotKeyCode = $0 }) }
     private var cleanupProviderBinding: Binding<String> { Binding(get: { settings.cleanupProvider }, set: { settings.cleanupProvider = $0 }) }
     private var ollamaModelBinding: Binding<String?> { Binding(get: { settings.ollamaModel }, set: { settings.ollamaModel = $0 }) }
-    private var cliToolBinding: Binding<String> { Binding(get: { settings.cliTool }, set: { settings.cliTool = $0 }) }
     private var targetLanguageBinding: Binding<String> { Binding(get: { settings.targetLanguage }, set: { settings.targetLanguage = $0 }) }
 
     private static let languages = ["Spanish", "French", "German", "Portuguese", "Italian",
                                     "Hindi", "Telugu", "Mandarin Chinese", "Japanese", "Korean", "Arabic"]
 
     private func detect() {
-        detectedTools = CLICleaner.detectTools()
         Task {
             let models = await OllamaCleaner.detectModels()
             await MainActor.run {
