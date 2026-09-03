@@ -14,40 +14,76 @@ struct InsightsView: View {
 
     // Adaptive columns: the stat cards and the two panels wrap to fewer
     // columns (down to one) as the window narrows.
-    private let statColumns = [GridItem(.adaptive(minimum: 200), spacing: 16)]
-    private let panelColumns = [GridItem(.adaptive(minimum: 320), spacing: 16)]
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 header
-
-                LazyVGrid(columns: statColumns, alignment: .leading, spacing: 16) {
-                    StudioCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            StudioStat(value: "\(stats.avgWPM)", unit: "wpm", label: "Average pace")
-                            ArcGauge(fraction: min(Double(stats.avgWPM) / 180.0, 1))
-                                .frame(height: 66)
-                                .frame(maxWidth: .infinity)
-                        }
-                    }.frame(maxWidth: .infinity)
-                    StudioCard { StudioStat(value: dictations.formatted(), label: "Dictations") }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    StudioCard { StudioStat(value: stats.words.formatted(), label: "Words all time") }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                LazyVGrid(columns: panelColumns, alignment: .leading, spacing: 16) {
-                    usageCard.frame(maxWidth: .infinity)
-                    heatmapCard.frame(maxWidth: .infinity)
-                }
-
+                topStats
+                panels
                 privacyCounter
             }
             .padding(.horizontal, 32).padding(.top, 30).padding(.bottom, 34)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear(perform: reload)
+    }
+
+    // Three equal-height stat cards; reflow to 1 + 2 when the window is narrow.
+    private var topStats: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                wpmCard
+                metricCard(value: dictations.formatted(), label: "Dictations")
+                metricCard(value: stats.words.formatted(), label: "Words all time")
+            }
+            VStack(spacing: 16) {
+                wpmCard
+                HStack(alignment: .top, spacing: 16) {
+                    metricCard(value: dictations.formatted(), label: "Dictations")
+                    metricCard(value: stats.words.formatted(), label: "Words all time")
+                }
+            }
+        }
+    }
+
+    private var wpmCard: some View {
+        StudioCard {
+            VStack(alignment: .leading, spacing: 12) {
+                StudioStat(value: "\(stats.avgWPM)", unit: "wpm", label: "Average pace")
+                Spacer(minLength: 6)
+                ArcGauge(fraction: min(Double(stats.avgWPM) / 180.0, 1))
+                    .frame(height: 58).frame(maxWidth: .infinity)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    /// A number card whose value sits centered so it matches the taller gauge card's height.
+    private func metricCard(value: String, label: String) -> some View {
+        StudioCard {
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
+                StudioStat(value: value, label: label)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // Usage + activity, side by side when wide, stacked when narrow.
+    private var panels: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                usageCard.frame(maxWidth: .infinity)
+                heatmapCard.frame(maxWidth: .infinity)
+            }
+            VStack(spacing: 16) {
+                usageCard.frame(maxWidth: .infinity)
+                heatmapCard.frame(maxWidth: .infinity)
+            }
+        }
     }
 
     private var header: some View {
