@@ -2,242 +2,185 @@ import SwiftUI
 import KeyVoiceDesign
 import KeyVoiceStore
 
-/// Dictionary: custom words and replacements the user teaches KeyVoice.
+/// Dictionary: custom words and replacements the user teaches KeyVoice. Studio language — the same
+/// warm paper, serif, and spectrum as every other screen (it used to be on the old glass system).
 struct DictionaryView: View {
     let store: Store
 
     @State private var entries: [DictionaryEntry] = []
-    @State private var searchText = ""
-    @State private var heardText = ""
-    @State private var replacementText = ""
+    @State private var search = ""
+    @State private var heard = ""
+    @State private var replacement = ""
 
-    private var filteredEntries: [DictionaryEntry] {
-        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return entries }
-
-        return entries.filter { entry in
-            entry.from.localizedCaseInsensitiveContains(query)
-                || entry.to.localizedCaseInsensitiveContains(query)
-        }
+    private var filtered: [DictionaryEntry] {
+        let q = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return entries }
+        return entries.filter { $0.from.localizedCaseInsensitiveContains(q) || $0.to.localizedCaseInsensitiveContains(q) }
     }
 
     private var canAdd: Bool {
-        !heardText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !replacementText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !heard.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !replacement.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.l) {
-            VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.xs) {
-                Text("Dictionary")
-                    .font(KeyVoiceTokens.Typography.title)
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                Text("Teach KeyVoice how to turn the words it hears into the words you want.")
-                    .font(KeyVoiceTokens.Typography.body)
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.68))
-            }
-
-            HStack(spacing: KeyVoiceTokens.Spacing.s) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.58))
-                TextField("Search heard text or replacements", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(KeyVoiceTokens.Typography.body)
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.5))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Clear search")
-                }
-            }
-            .padding(.horizontal, KeyVoiceTokens.Spacing.m)
-            .padding(.vertical, KeyVoiceTokens.Spacing.s)
-            .glassSurface(
-                shape: RoundedRectangle(
-                    cornerRadius: KeyVoiceTokens.Radius.small,
-                    style: .continuous
-                )
-            )
-
-            GlassCard {
-                VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.m) {
-                    Label("Add replacement", systemImage: "plus")
-                        .font(KeyVoiceTokens.Typography.headline)
-                        .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                        .symbolRenderingMode(.monochrome)
-                        .tint(KeyVoiceTokens.Colors.ice)
-
-                    HStack(alignment: .bottom, spacing: KeyVoiceTokens.Spacing.m) {
-                        dictionaryField(
-                            label: "Heard",
-                            placeholder: "What KeyVoice heard",
-                            text: $heardText
-                        )
-
-                        Image(systemName: "arrow.right")
-                            .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.5))
-                            .padding(.bottom, KeyVoiceTokens.Spacing.s)
-
-                        dictionaryField(
-                            label: "Replace with",
-                            placeholder: "Preferred word or phrase",
-                            text: $replacementText
-                        )
-
-                        Button(action: addEntry) {
-                            Text("Add")
-                                .font(KeyVoiceTokens.Typography.body.weight(.semibold))
-                                .foregroundStyle(.black.opacity(0.82))
-                                .padding(.horizontal, KeyVoiceTokens.Spacing.l)
-                                .padding(.vertical, KeyVoiceTokens.Spacing.s)
-                                .background(
-                                    canAdd
-                                        ? KeyVoiceTokens.Colors.ice
-                                        : KeyVoiceTokens.Colors.ice.opacity(0.36),
-                                    in: Capsule()
-                                )
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canAdd)
-                        .accessibilityHint("Adds this replacement to the dictionary")
-                    }
-                }
-            }
-
-            Group {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                header
+                addCard
+                searchField
                 if entries.isEmpty {
-                    GlassPanel {
-                        ContentUnavailableView(
-                            "No Dictionary Entries",
-                            systemImage: "character.book.closed",
-                            description: Text("Add a replacement above to teach KeyVoice a word or phrase.")
-                        )
-                        .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                } else if filteredEntries.isEmpty {
-                    GlassPanel {
-                        ContentUnavailableView.search(text: searchText)
-                            .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+                    empty("No entries yet", "Teach KeyVoice a word or phrase above.")
+                } else if filtered.isEmpty {
+                    empty("No matches", "Try a different search.")
                 } else {
-                    VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.s) {
-                        SectionHeader("Replacements")
-                            .padding(.horizontal, KeyVoiceTokens.Spacing.xs)
-
-                        ScrollView {
-                            LazyVStack(spacing: KeyVoiceTokens.Spacing.s) {
-                                ForEach(filteredEntries) { entry in
-                                    DictionaryEntryRow(entry: entry) {
-                                        delete(entry)
-                                    }
+                    StudioCard(padding: 0) {
+                        VStack(spacing: 0) {
+                            ForEach(filtered) { entry in
+                                DictionaryRow(entry: entry) { delete(entry) }
+                                if entry.id != filtered.last?.id {
+                                    Rectangle().fill(KeyVoiceTokens.Colors.line).frame(height: 1).padding(.horizontal, 18)
                                 }
                             }
-                            .padding(.vertical, KeyVoiceTokens.Spacing.xs)
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .padding(.horizontal, 32).padding(.top, 30).padding(.bottom, 34)
         }
-        .padding(KeyVoiceTokens.Spacing.xl)
-        .navigationTitle("Dictionary")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear(perform: reload)
     }
 
-    private func dictionaryField(
-        label: String,
-        placeholder: String,
-        text: Binding<String>
-    ) -> some View {
-        VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.s) {
-            SectionHeader(label)
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Dictionary").font(.studioSerif(30)).foregroundStyle(KeyVoiceTokens.Colors.text)
+            Text("Turn the words KeyVoice hears into the words you want — names, acronyms, spellings.")
+                .font(.system(size: 14.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
+        }
+    }
+
+    private var addCard: some View {
+        StudioCard {
+            VStack(alignment: .leading, spacing: 14) {
+                StudioSectionLabel("Add a replacement")
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        field("Heard", "what KeyVoice heard", $heard)
+                        Image(systemName: "arrow.right").foregroundStyle(KeyVoiceTokens.Colors.fog).padding(.bottom, 9)
+                        field("Replace with", "preferred word or phrase", $replacement)
+                        addButton
+                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        field("Heard", "what KeyVoice heard", $heard)
+                        field("Replace with", "preferred word or phrase", $replacement)
+                        addButton.frame(maxWidth: .infinity)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var addButton: some View {
+        Button(action: add) {
+            Text("Add").font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(canAdd ? .white : KeyVoiceTokens.Colors.fog)
+                .padding(.horizontal, 20).padding(.vertical, 9)
+                .background(Capsule().fill(canAdd ? KeyVoiceTokens.Colors.accent : KeyVoiceTokens.Colors.paper2))
+        }
+        .buttonStyle(.plain).focusEffectDisabled().disabled(!canAdd)
+    }
+
+    private func field(_ label: String, _ placeholder: String, _ text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label.uppercased()).font(.system(size: 11, weight: .semibold)).tracking(0.4)
+                .foregroundStyle(KeyVoiceTokens.Colors.fog)
             TextField(placeholder, text: text)
-                .textFieldStyle(.plain)
-                .font(KeyVoiceTokens.Typography.body)
-                .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                .padding(.horizontal, KeyVoiceTokens.Spacing.m)
-                .padding(.vertical, KeyVoiceTokens.Spacing.s)
-                .background(
-                    KeyVoiceTokens.Colors.glassGround,
-                    in: RoundedRectangle(
-                        cornerRadius: KeyVoiceTokens.Radius.small,
-                        style: .continuous
-                    )
-                )
-                .onSubmit(addEntry)
+                .textFieldStyle(.plain).font(.system(size: 14.5))
+                .foregroundStyle(KeyVoiceTokens.Colors.text).tint(KeyVoiceTokens.Colors.accent)
+                .padding(.horizontal, 13).padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 11, style: .continuous).fill(KeyVoiceTokens.Colors.paper2))
+                .onSubmit(add)
         }
         .frame(maxWidth: .infinity)
     }
 
-    private func addEntry() {
-        let from = heardText.trimmingCharacters(in: .whitespacesAndNewlines)
-        let to = replacementText.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var searchField: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "magnifyingglass").foregroundStyle(KeyVoiceTokens.Colors.fog)
+            TextField("Search replacements", text: $search)
+                .textFieldStyle(.plain).font(.system(size: 14.5))
+                .foregroundStyle(KeyVoiceTokens.Colors.text).tint(KeyVoiceTokens.Colors.accent)
+            if !search.isEmpty {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(KeyVoiceTokens.Colors.fog)
+                }.buttonStyle(.plain).focusEffectDisabled()
+            }
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .background(Capsule().fill(KeyVoiceTokens.Colors.card).overlay(Capsule().strokeBorder(KeyVoiceTokens.Colors.line, lineWidth: 1)))
+    }
+
+    private func empty(_ title: String, _ subtitle: String) -> some View {
+        StudioCard {
+            VStack(spacing: 10) {
+                Image(systemName: "character.book.closed").font(.system(size: 30, weight: .light))
+                    .foregroundStyle(KeyVoiceTokens.Colors.accent)
+                Text(title).font(.studioSerif(20)).foregroundStyle(KeyVoiceTokens.Colors.text)
+                Text(subtitle).font(.system(size: 13.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, 16)
+        }
+    }
+
+    // MARK: - Data
+
+    private func reload() { entries = store.dictionaryEntries() }
+
+    private func add() {
+        let from = heard.trimmingCharacters(in: .whitespacesAndNewlines)
+        let to = replacement.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !from.isEmpty, !to.isEmpty else { return }
-
         store.addDictionaryEntry(from: from, to: to)
-        heardText = ""
-        replacementText = ""
+        heard = ""; replacement = ""
         reload()
     }
 
-    private func delete(_ entry: DictionaryEntry) {
-        store.delete(entry)
-        reload()
-    }
-
-    private func reload() {
-        entries = store.dictionaryEntries()
-    }
+    private func delete(_ entry: DictionaryEntry) { store.delete(entry); reload() }
 }
 
-private struct DictionaryEntryRow: View {
+/// One replacement row: heard → replacement, with a hover-revealed delete.
+private struct DictionaryRow: View {
     let entry: DictionaryEntry
     let onDelete: () -> Void
-
     @State private var hovering = false
 
     var body: some View {
-        GlassRow {
-            VStack(alignment: .leading, spacing: KeyVoiceTokens.Spacing.xs) {
-                Text(entry.from)
-                    .font(KeyVoiceTokens.Typography.body.weight(.medium))
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink)
-                Text(entry.to)
-                    .font(KeyVoiceTokens.Typography.body)
-                    .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.64))
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.from).font(.system(size: 15, weight: .medium)).foregroundStyle(KeyVoiceTokens.Colors.text)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.turn.down.right").font(.system(size: 11)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    Text(entry.to).font(.system(size: 13.5)).foregroundStyle(KeyVoiceTokens.Colors.text2)
+                }
             }
-        } trailing: {
-            HStack(spacing: KeyVoiceTokens.Spacing.m) {
-                if entry.starred {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(KeyVoiceTokens.Colors.ice)
-                        .accessibilityLabel("Starred")
+            Spacer(minLength: 8)
+            if entry.starred {
+                Image(systemName: "star.fill").font(.system(size: 12)).foregroundStyle(KeyVoiceTokens.Colors.accent)
+            }
+            if hovering {
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
                 }
-
-                if hovering {
-                    Button(role: .destructive, action: onDelete) {
-                        Image(systemName: "trash")
-                            .foregroundStyle(KeyVoiceTokens.Colors.ink.opacity(0.62))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Delete replacement")
-                    .accessibilityLabel("Delete \(entry.from)")
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+                .buttonStyle(.plain).focusEffectDisabled()
+                .help("Delete replacement").accessibilityLabel("Delete \(entry.from)")
+                .transition(.opacity)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18).padding(.vertical, 14)
         .contentShape(Rectangle())
-        .onHover { isHovering in
-            withAnimation(KeyVoiceTokens.Motion.quick) {
-                hovering = isHovering
-            }
-        }
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
     }
 }

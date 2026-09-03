@@ -70,8 +70,11 @@ public struct StudioShell: View {
                         .font(.system(size: 13, weight: .bold))
                         .foregroundStyle(KeyVoiceTokens.Colors.paper)
                 }
-            (Text("Key").font(.studioSerif(19, .medium)) + Text("Voice").font(.studioSerif(19, .regular)).italic())
-                .foregroundStyle(KeyVoiceTokens.Colors.text)
+            HStack(spacing: 0) {
+                Text("Key").font(.studioSerif(19, .medium))
+                Text("Voice").font(.studioSerif(19, .regular)).italic()
+            }
+            .foregroundStyle(KeyVoiceTokens.Colors.text)
         }
     }
 

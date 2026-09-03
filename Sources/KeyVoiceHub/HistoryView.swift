@@ -68,20 +68,7 @@ struct HistoryView: View {
     }
 
     private func row(_ record: TranscriptRecord) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(record.text)
-                .font(.system(size: 15)).foregroundStyle(KeyVoiceTokens.Colors.text)
-                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            Text(meta(record))
-                .font(.system(size: 12.5, weight: .medium)).foregroundStyle(KeyVoiceTokens.Colors.fog)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 18).padding(.vertical, 15)
-        .contentShape(Rectangle())
-        .contextMenu {
-            Button("Copy") { copy(record) }
-            Button("Delete", role: .destructive) { delete(record) }
-        }
+        HistoryRow(record: record, meta: meta(record), onCopy: { copy(record) }, onDelete: { delete(record) })
     }
 
     private var empty: some View {
@@ -126,4 +113,63 @@ struct HistoryView: View {
         NSPasteboard.general.setString(r.text, forType: .string)
     }
     private func delete(_ r: TranscriptRecord) { store.delete(r); reload() }
+}
+
+/// One transcript row with hover-revealed Copy (with a "Copied" tick) and Delete. The context menu
+/// mirrors the same actions for right-click / VoiceOver.
+private struct HistoryRow: View {
+    let record: TranscriptRecord
+    let meta: String
+    let onCopy: () -> Void
+    let onDelete: () -> Void
+
+    @State private var hovering = false
+    @State private var copied = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(record.text)
+                    .font(.system(size: 15)).foregroundStyle(KeyVoiceTokens.Colors.text)
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                Text(meta)
+                    .font(.system(size: 12.5, weight: .medium)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+            }
+            Spacer(minLength: 8)
+            // Actions are always reachable via the context menu; on hover they surface as buttons.
+            if hovering || copied {
+                HStack(spacing: 6) {
+                    Button(action: copyAndConfirm) {
+                        Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                            .labelStyle(.iconOnly).font(.system(size: 13))
+                            .foregroundStyle(copied ? KeyVoiceTokens.Colors.good : KeyVoiceTokens.Colors.fog)
+                    }
+                    .buttonStyle(.plain).focusEffectDisabled()
+                    .help(copied ? "Copied" : "Copy").accessibilityLabel(copied ? "Copied" : "Copy transcript")
+                    Button(role: .destructive, action: onDelete) {
+                        Image(systemName: "trash").font(.system(size: 13)).foregroundStyle(KeyVoiceTokens.Colors.fog)
+                    }
+                    .buttonStyle(.plain).focusEffectDisabled()
+                    .help("Delete").accessibilityLabel("Delete transcript")
+                }
+                .transition(.opacity)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 18).padding(.vertical, 15)
+        .contentShape(Rectangle())
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
+        .contextMenu {
+            Button("Copy") { onCopy() }
+            Button("Delete", role: .destructive) { onDelete() }
+        }
+    }
+
+    private func copyAndConfirm() {
+        onCopy()
+        withAnimation(.easeOut(duration: 0.12)) { copied = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+            withAnimation(.easeOut(duration: 0.2)) { copied = false }
+        }
+    }
 }
