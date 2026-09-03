@@ -7,9 +7,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 CONFIG="${1:-release}"
 
-echo "Compiling shaders…"
-./Scripts/build-shaders.sh
-
 echo "Building ($CONFIG)…"
 swift build -c "$CONFIG"
 

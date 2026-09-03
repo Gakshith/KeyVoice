@@ -22,12 +22,9 @@ let package = Package(
         .target(name: "KeyVoiceInsert", dependencies: ["KeyVoiceCore"]),   // branch: paste
         .target(name: "KeyVoiceAudio",  dependencies: ["KeyVoiceCore"]),   // branch: speech
         .target(name: "KeyVoiceCleanup", dependencies: ["KeyVoiceCore"]),  // branch: cleanup
-        .target(
-            name: "KeyVoiceHUD",
-            dependencies: ["KeyVoiceCore", "KeyVoiceDesign"],   // floating Aurora HUD (glass + Metal)
-            exclude: ["Shaders"],                                // .metal source; precompiled by Scripts/build-shaders.sh
-            resources: [.copy("Resources/default.metallib")]     // loaded at runtime via ShaderLibrary(url:)
-        ),
+        // Floating Living HUD — Liquid Glass capsule + a SwiftUI Canvas Aurora. No Metal, no
+        // resource bundle (the old .metallib caused a clean-Mac packaging crash — audit P0 · SHIP).
+        .target(name: "KeyVoiceHUD", dependencies: ["KeyVoiceCore", "KeyVoiceDesign"]),
 
         // MVP product modules.
         .target(name: "KeyVoiceStore",   dependencies: ["KeyVoiceCore"]),                    // local history + dictionary + settings (SwiftData)
