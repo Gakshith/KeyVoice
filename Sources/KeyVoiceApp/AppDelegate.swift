@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var coordinator: Coordinator?
     private var status: StatusController?
     private var hud: HUDController?
+    private var caption: CaptionController?
     private var levelMeter: AudioLevelMeter?
     private var store: Store?
     private var settings: SettingsStore?
@@ -45,15 +46,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             onPermissions: { windowManager.showOnboarding() }
         )
         let hud = HUDController(config: config)
+        let caption = CaptionController()
         let levelMeter = AudioLevelMeter()
         self.status = status
         self.hud = hud
+        self.caption = caption
         self.levelMeter = levelMeter
+
+        // Apple on-device streaming transcriber (macOS 26). Hoisted so we can hook its live partials.
+        let speech = SpeechTranscriberEngine()
+        speech.onPartial = { [weak caption, weak settings] text in
+            Task { @MainActor in
+                guard settings?.showHUD ?? true else { return }   // caption rides with the HUD toggle
+                caption?.setText(text)
+            }
+        }
 
         let coordinator = Coordinator(
             hotkey: HotkeyMonitor(config: config),
             audio: MicAudioCapture(config: config),
-            transcriber: SpeechTranscriberEngine(),   // Apple on-device (macOS 26); Apple-only, no fallback
+            transcriber: speech,
             cleaner: RoutingCleaner(config: config),   // routes to the user's chosen backend, live
             inserter: PasteInserter(config: config),
             targets: AXTargetProvider(),
@@ -61,9 +73,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         // Status fans out to the menu bar always, and to the HUD only if the user keeps it on.
-        coordinator.onStatus = { [weak status, weak hud, weak settings] s in
+        coordinator.onStatus = { [weak status, weak hud, weak caption, weak settings] s in
             status?.update(s)
-            hud?.update((settings?.showHUD ?? true) ? s : .idle)
+            let hudOn = settings?.showHUD ?? true
+            hud?.update(hudOn ? s : .idle)
+            caption?.update(hudOn ? s : .idle)
             if (s == .inserted || s == .insertedRaw), settings?.soundEnabled == true {
                 NSSound(named: "Tink")?.play()   // subtle confirmation when text lands
             }
@@ -81,6 +95,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Per-app writing style: look up the user's Styles rule for the frontmost app.
         coordinator.styleProvider = { [weak store] bundleId in store?.style(forBundleId: bundleId) }
+        // Translation: the user's chosen target language (nil when off), applied during cleanup.
+        coordinator.languageProvider = { [weak settings] in
+            guard let lang = settings?.targetLanguage, lang != "off", !lang.isEmpty else { return nil }
+            return lang
+        }
 
         self.coordinator = coordinator
         rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)

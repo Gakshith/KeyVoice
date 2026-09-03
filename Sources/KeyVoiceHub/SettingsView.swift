@@ -96,6 +96,16 @@ struct SettingsView: View {
                         }
                     }
 
+                    if settings.cleanupProvider != "off" {
+                        Divider().overlay(KeyVoiceTokens.Colors.line)
+                        SettingsRow("Translate to", caption: "Dictate in any language; insert it in this one.") {
+                            Picker("", selection: targetLanguageBinding) {
+                                Text("Don't translate").tag("off")
+                                ForEach(Self.languages, id: \.self) { Text($0).tag($0) }
+                            }.labelsHidden().frame(maxWidth: 210)
+                        }
+                    }
+
                     Divider().overlay(KeyVoiceTokens.Colors.line)
                     SettingsNote("🔒 Your audio is always transcribed on-device. Only Claude / CLI text-cleanup leaves this Mac.")
                 }
@@ -148,6 +158,10 @@ struct SettingsView: View {
     private var cleanupProviderBinding: Binding<String> { Binding(get: { settings.cleanupProvider }, set: { settings.cleanupProvider = $0 }) }
     private var ollamaModelBinding: Binding<String?> { Binding(get: { settings.ollamaModel }, set: { settings.ollamaModel = $0 }) }
     private var cliToolBinding: Binding<String> { Binding(get: { settings.cliTool }, set: { settings.cliTool = $0 }) }
+    private var targetLanguageBinding: Binding<String> { Binding(get: { settings.targetLanguage }, set: { settings.targetLanguage = $0 }) }
+
+    private static let languages = ["Spanish", "French", "German", "Portuguese", "Italian",
+                                    "Hindi", "Telugu", "Mandarin Chinese", "Japanese", "Korean", "Arabic"]
 
     private func detect() {
         detectedTools = CLICleaner.detectTools()

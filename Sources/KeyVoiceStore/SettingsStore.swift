@@ -65,4 +65,10 @@ public final class SettingsStore {
         get { defaults.string(forKey: "cliTool") ?? "claude" }
         set { defaults.set(newValue, forKey: "cliTool") }
     }
+
+    /// Language to translate cleaned text into (e.g. "Spanish"), or "off" for none. Needs a cleanup tier.
+    public var targetLanguage: String {
+        get { defaults.string(forKey: "targetLanguage") ?? "off" }
+        set { defaults.set(newValue, forKey: "targetLanguage") }
+    }
 }

@@ -34,9 +34,12 @@ public struct AppContext: Sendable, Equatable {
     /// The user's explicit per-app writing style (e.g. "formal"), if they set one in Styles. When
     /// present the cleaner honors it; when nil the cleaner falls back to its own app-category tone.
     public let styleHint: String?
-    public init(bundleId: String, appName: String, styleHint: String? = nil) {
+    /// Target language to translate the cleaned text into (e.g. "Spanish"), or nil for no translation.
+    public let translateTo: String?
+    public init(bundleId: String, appName: String, styleHint: String? = nil, translateTo: String? = nil) {
         self.bundleId = bundleId
         self.appName = appName
         self.styleHint = styleHint
+        self.translateTo = translateTo
     }
 }
