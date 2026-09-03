@@ -30,6 +30,27 @@ public final class SpeechTranscriberEngine: Transcriber {
 
     public init() {}
 
+    /// Ensures the on-device speech model is installed. Safe to call at launch (pre-warm). Returns
+    /// true if recognition is ready to use now. Never throws — logs and returns false on failure.
+    public func ensureAssetsReady() async -> Bool {
+        guard #available(macOS 26, *) else { return false }
+
+        let transcriber = SpeechTranscriber(
+            locale: requestedLocale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: []
+        )
+
+        do {
+            try await Self.ensureAssets(for: transcriber)
+            return true
+        } catch {
+            Log.error("speech asset preflight failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
     public func beginSession() throws {
         guard #available(macOS 26, *) else {
             // Streaming Speech API doesn't exist on the deploy target — fall back.

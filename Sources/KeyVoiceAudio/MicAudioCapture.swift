@@ -32,6 +32,9 @@ public final class MicAudioCapture: AudioCapturing {
         }
         // The tap format must match the node's own output format, or `installTap` traps.
         let format = input.outputFormat(forBus: 0)
+        guard format.channelCount > 0, format.sampleRate > 0 else {
+            throw KeyVoiceError.microphoneBusy
+        }
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             self?.onBuffer?(buffer)
         }
