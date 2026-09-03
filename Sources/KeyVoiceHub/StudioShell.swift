@@ -8,13 +8,13 @@ import KeyVoiceStore
 public struct StudioShell: View {
     let store: Store
     let settings: SettingsStore
+    let nav: HubNavigation
     let onSetAPIKey: () -> Void
 
-    @State private var section: StudioSection = .dictation
-
-    public init(store: Store, settings: SettingsStore, onSetAPIKey: @escaping () -> Void) {
+    public init(store: Store, settings: SettingsStore, nav: HubNavigation, onSetAPIKey: @escaping () -> Void) {
         self.store = store
         self.settings = settings
+        self.nav = nav
         self.onSetAPIKey = onSetAPIKey
     }
 
@@ -48,13 +48,12 @@ public struct StudioShell: View {
                 .padding(.bottom, 8)
 
             ForEach(StudioSection.allCases) { s in
-                StudioNavItem(s.title, systemImage: s.icon, selected: section == s) {
-                    section = s
+                StudioNavItem(s.title, systemImage: s.icon, selected: nav.section == s) {
+                    nav.section = s
                 }
             }
 
             Spacer(minLength: 16)
-            privacyCard
         }
         .padding(.horizontal, 12)
         .padding(.top, 46)          // clear the traffic lights
@@ -76,32 +75,10 @@ public struct StudioShell: View {
         }
     }
 
-    private var privacyCard: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("No account. No cloud.")
-                .font(.studioSerif(17))
-                .foregroundStyle(KeyVoiceTokens.Colors.text)
-            Text("Transcribed on this Mac. Unlimited words, forever.")
-                .font(.system(size: 12))
-                .foregroundStyle(KeyVoiceTokens.Colors.text2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(15)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(KeyVoiceTokens.Colors.accentSoft)
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(KeyVoiceTokens.Colors.accent.opacity(0.18), lineWidth: 1)
-                }
-        }
-    }
-
     // MARK: - Detail
 
     @ViewBuilder private var detail: some View {
-        switch section {
+        switch nav.section {
         case .dictation:  DictationView(store: store)
         case .history:    HistoryView(store: store)
         case .dictionary: DictionaryView(store: store)
@@ -111,6 +88,14 @@ public struct StudioShell: View {
         case .settings:   SettingsView(store: store, settings: settings, onSetAPIKey: onSetAPIKey)
         }
     }
+}
+
+/// Shared selection for the Hub, so the menu bar can deep-link to a section (e.g. Settings).
+@MainActor
+@Observable
+public final class HubNavigation {
+    public var section: StudioSection = .dictation
+    public init() {}
 }
 
 /// The Studio sidebar sections, in order.

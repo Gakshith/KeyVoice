@@ -53,6 +53,7 @@ public struct StudioNavItem: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()   // no macOS keyboard focus ring (the blue box)
         .onHover { hovering = $0 }
     }
 }

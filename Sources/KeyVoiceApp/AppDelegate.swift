@@ -43,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let status = StatusController(
             onOpenHub: { windowManager.showHub() },
+            onOpenSettings: { windowManager.showSettings() },
             onPermissions: { windowManager.showOnboarding() }
         )
         let hud = HUDController(config: config)

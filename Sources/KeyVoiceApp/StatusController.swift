@@ -9,14 +9,16 @@ import KeyVoiceCleanup
 final class StatusController {
     private let item: NSStatusItem
     private let onOpenHub: () -> Void
+    private let onOpenSettings: () -> Void
     private let onPermissions: () -> Void
 
     /// Guards the transient symbols (checkmark / exclamation): a later state change invalidates a
     /// pending revert so we never stomp fresh state.
     private var revertToken = 0
 
-    init(onOpenHub: @escaping () -> Void, onPermissions: @escaping () -> Void) {
+    init(onOpenHub: @escaping () -> Void, onOpenSettings: @escaping () -> Void, onPermissions: @escaping () -> Void) {
         self.onOpenHub = onOpenHub
+        self.onOpenSettings = onOpenSettings
         self.onPermissions = onPermissions
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         setSymbol("waveform")
@@ -28,8 +30,8 @@ final class StatusController {
         menu.addItem(.separator())
 
         menu.addItem(makeItem("Open KeyVoice", #selector(openHub)))
+        menu.addItem(makeItem("Settings…", #selector(openSettings)))
         menu.addItem(makeItem("Permissions…", #selector(openPermissions)))
-        menu.addItem(makeItem("Set API Key…", #selector(setAPIKey)))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         item.menu = menu
@@ -85,8 +87,8 @@ final class StatusController {
     // MARK: - Actions
 
     @objc private func openHub() { onOpenHub() }
+    @objc private func openSettings() { onOpenSettings() }
     @objc private func openPermissions() { onPermissions() }
-    @objc private func setAPIKey() { promptForAPIKey() }
 
     /// Presents the Anthropic API-key dialog. Public so the Hub's Settings can trigger the same flow.
     func promptForAPIKey() {

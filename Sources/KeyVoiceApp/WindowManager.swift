@@ -17,6 +17,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
 
     private var hubWindow: NSWindow?
     private var onboardingWindow: NSWindow?
+    private let hubNav = HubNavigation()
 
     init(store: Store, settings: SettingsStore, onSetAPIKey: @escaping () -> Void, onRearm: @escaping () -> Void) {
         self.store = store
@@ -25,16 +26,20 @@ final class WindowManager: NSObject, NSWindowDelegate {
         self.onRearm = onRearm
     }
 
-    func showHub() {
+    func showHub(section: StudioSection? = nil) {
+        if let section { hubNav.section = section }   // deep-link (e.g. menu bar → Settings)
         if hubWindow == nil {
             hubWindow = makeWindow(
                 title: "KeyVoice",
-                content: StudioShell(store: store, settings: settings, onSetAPIKey: onSetAPIKey),
+                content: StudioShell(store: store, settings: settings, nav: hubNav, onSetAPIKey: onSetAPIKey),
                 fullBleed: true
             )
         }
         present(hubWindow)
     }
+
+    /// Open the Hub straight to Settings (menu bar → Settings…).
+    func showSettings() { showHub(section: .settings) }
 
     func showOnboarding() {
         if onboardingWindow == nil {
