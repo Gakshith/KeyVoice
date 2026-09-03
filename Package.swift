@@ -5,8 +5,9 @@ import PackageDescription
 // Modules map 1:1 to the plan's components so each can be built and reviewed on its own branch.
 let package = Package(
     name: "KeyVoice",
-    // Deploy target 14 for the app shell. On-device transcription (Apple SpeechAnalyzer) needs macOS 26 and is @available-guarded; below 26 dictation surfaces an error (Apple-only, no fallback).
-    platforms: [.macOS(.v14)],
+    // Deploy target macOS 26: the only transcription backend (Apple SpeechAnalyzer) requires it, so
+    // advertising an older minimum was a compatibility lie (audit P0 · COMPAT). Require 26 honestly.
+    platforms: [.macOS("26.0")],
     products: [
         .executable(name: "KeyVoice", targets: ["KeyVoiceApp"]),
         .library(name: "KeyVoiceDesign", targets: ["KeyVoiceDesign"])
