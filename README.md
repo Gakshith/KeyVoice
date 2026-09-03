@@ -3,20 +3,23 @@
 System-wide push-to-talk voice typing for macOS.
 
 Focus any text field — WhatsApp, Gmail, Slack, VS Code, Calendar, a browser — hold the
-push-to-talk key, and speak. On release KeyVoice transcribes what you said **on your Mac**,
-cleans up the grammar and formats it for the app you're in, and pastes it at your cursor.
+push-to-talk key, and speak. On release KeyVoice transcribes what you said **on your Mac** and
+pastes it at your cursor. If no field is focused, it saves the text to a scratchpad with a Copy
+button instead of losing it.
 
 ## How it works
 
 ```
-hold ⌥R → record mic → transcribe on-device → Claude fixes grammar/format → paste at the locked cursor
-release ┘                                       └ any failure/timeout/empty → paste raw or skip (never wrong window, never silent)
+hold ⌥ → record mic → transcribe on-device → optional cleanup → paste at the locked cursor
+release ┘                                     └ off / slow / empty → paste raw, or scratchpad if no target (never wrong window, never silent)
 ```
 
-- **Trigger** — hold **Right-Option (⌥)**. A listen-only key tap, so normal typing and ⌥-accents still work.
-- **Transcribe** — Apple **SpeechAnalyzer** (on-device, macOS 26+). Audio never leaves the Mac.
-- **Cleanup** — **Claude Haiku** fixes grammar and matches the app's tone. The transcript text is sent to Anthropic; audio is not.
-- **Insert** — clipboard paste-injection that works across native, Electron, and web apps, with your clipboard saved and restored.
+- **Trigger** — hold **Right-Option (⌥)** (rebindable to Left-Option). A listen-only key tap, so normal typing and ⌥-accents still work.
+- **Transcribe** — Apple **SpeechAnalyzer** (on-device, macOS 26+), English. **Audio never leaves the Mac.**
+- **Cleanup (optional, off by default)** — polish grammar/format with on-device **Ollama** or the **Claude API**. Only when you turn it on does *transcript text* leave the Mac (audio never does). Off = the raw transcription is pasted.
+- **Insert** — clipboard paste-injection that works across native, Electron, and web apps, with your clipboard saved and restored (and left alone if you copy something during the paste).
+- **No target?** — dictate with nothing focused and the text appears in a floating **scratchpad** with Copy. Secure/password fields are never captured.
+- **HUD** — a floating Liquid-Glass **Living HUD** (a SwiftUI Canvas Aurora) shows listening → thinking → done; no Metal, no bundled shader.
 
 ## Module layout
 
@@ -73,13 +76,27 @@ permission records, so grants won't apply until you clear them once:
 
 KeyVoice never modifies these records for you.
 
+**Distributing to other Macs.** The self-signed cert above is for **local development only**. A build
+you hand to someone else must be signed with a **Developer ID Application** certificate, built with a
+**hardened runtime** and the right entitlements (microphone, Input Monitoring/Accessibility), then
+**notarized and stapled** — otherwise Gatekeeper blocks it. That step needs an Apple Developer account
+and is not automated here.
+
 ## Requirements
 
 - macOS 26 (Tahoe) — transcription uses Apple's on-device **SpeechAnalyzer** (Apple-only, no fallback).
-- An Anthropic API key for the cleanup step (without it, KeyVoice pastes the raw transcription).
+- Cleanup is **optional and off by default**. For Claude cleanup, add an Anthropic API key in Settings;
+  for on-device cleanup, install Ollama. With cleanup off, KeyVoice pastes the raw transcription.
 
-## Status
+## Privacy
 
-Early build. Core pipeline, hotkey, paste, transcription, and cleanup are implemented and compile;
-end-to-end behavior needs live validation on the target Mac (permissions, first-run speech-model
-download, cross-app paste). See `docs/` and the project plan for the phased acceptance tests.
+- **Audio never leaves your Mac** — recognition is fully on-device.
+- **Transcript text** leaves only if you enable **Claude** cleanup (sent to Anthropic). On-device
+  Ollama and "off" keep everything local.
+- History, dictionary, snippets, and stats are stored locally (SwiftData). No account, no telemetry.
+
+## Known limitations
+
+- Recognition is **English (en-US)**. "Translate to" transcribes English, then translates via the cleanup model.
+- Cleanup latency is capped (~4s); past that, the raw text is pasted so you're never blocked.
+- Distribution requires your own Developer ID + notarization (see Code signing).
