@@ -30,7 +30,7 @@ let package = Package(
 
         // MVP product modules.
         .target(name: "KeyVoiceStore",   dependencies: ["KeyVoiceCore"]),                    // local history + dictionary + settings (SwiftData)
-        .target(name: "KeyVoiceHub",     dependencies: ["KeyVoiceCore", "KeyVoiceStore", "KeyVoiceDesign"]),   // the Hub window: Home / Dictionary / Settings
+        .target(name: "KeyVoiceHub",     dependencies: ["KeyVoiceCore", "KeyVoiceStore", "KeyVoiceDesign", "KeyVoiceCleanup"]),   // the Studio window: Dictation / History / … / Settings
         .target(name: "KeyVoiceOnboarding", dependencies: ["KeyVoiceCore", "KeyVoiceStore", "KeyVoiceDesign"]),// first-run permission walkthrough
 
         // The app shell wires the concrete implementations into the Coordinator.

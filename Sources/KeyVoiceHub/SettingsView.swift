@@ -3,11 +3,15 @@ import AVFoundation
 import ServiceManagement
 import SwiftUI
 import KeyVoiceStore
+import KeyVoiceCleanup
 
 struct SettingsView: View {
     let store: Store
     let settings: SettingsStore
     let onSetAPIKey: () -> Void
+
+    @State private var ollamaModels: [String] = []
+    @State private var detectedTools: [CLITool] = []
 
     var body: some View {
         Form {
@@ -44,10 +48,49 @@ struct SettingsView: View {
                 Toggle("Play a sound", isOn: soundEnabledBinding)
             }
 
-            Section("Cleanup") {
-                LabeledContent("Transcription cleanup") {
-                    Button("Set API Key…", action: onSetAPIKey)
+            Section("Transcription cleanup") {
+                Picker("Polish transcripts with", selection: cleanupProviderBinding) {
+                    Text("Off — raw (most private)").tag("off")
+                    Text("On-device · Ollama").tag("ollama")
+                    Text("Installed CLI").tag("cli")
+                    Text("Claude API key").tag("claude")
                 }
+
+                if settings.cleanupProvider == "ollama" {
+                    if ollamaModels.isEmpty {
+                        Text("Ollama not detected. Install and run Ollama, then Refresh.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Picker("Model", selection: ollamaModelBinding) {
+                            ForEach(ollamaModels, id: \.self) { Text($0).tag(Optional($0)) }
+                        }
+                    }
+                    Button("Refresh detection", action: detect)
+                }
+
+                if settings.cleanupProvider == "cli" {
+                    if detectedTools.isEmpty {
+                        Text("No CLI found (claude, codex, gemini). Install one, then Refresh.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else {
+                        Picker("Tool", selection: cliToolBinding) {
+                            ForEach(detectedTools, id: \.self) { Text($0.rawValue).tag($0.rawValue) }
+                        }
+                    }
+                    Text("Experimental — reuses a CLI you're already signed into. Slower than Ollama.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Refresh detection", action: detect)
+                }
+
+                if settings.cleanupProvider == "claude" {
+                    LabeledContent("Anthropic API key") {
+                        Button("Set API Key…", action: onSetAPIKey)
+                    }
+                }
+
+                Label("Your audio is always transcribed on-device. Only Claude / CLI text-cleanup leaves this Mac.",
+                      systemImage: "lock.shield")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section("Data") {
@@ -65,9 +108,10 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .scrollContentBackground(.hidden)   // show the aurora backdrop through the form
+        .scrollContentBackground(.hidden)
         .padding()
         .navigationTitle("Settings")
+        .task { detect() }
     }
 
     private var microphones: [AVCaptureDevice] {
@@ -118,6 +162,30 @@ struct SettingsView: View {
             get: { settings.hotKeyCode },
             set: { settings.hotKeyCode = $0 }
         )
+    }
+
+    private var cleanupProviderBinding: Binding<String> {
+        Binding(get: { settings.cleanupProvider }, set: { settings.cleanupProvider = $0 })
+    }
+
+    private var ollamaModelBinding: Binding<String?> {
+        Binding(get: { settings.ollamaModel }, set: { settings.ollamaModel = $0 })
+    }
+
+    private var cliToolBinding: Binding<String> {
+        Binding(get: { settings.cliTool }, set: { settings.cliTool = $0 })
+    }
+
+    /// Probe for installed CLIs (sync) and running Ollama models (async), for the pickers.
+    private func detect() {
+        detectedTools = CLICleaner.detectTools()
+        Task {
+            let models = await OllamaCleaner.detectModels()
+            await MainActor.run {
+                ollamaModels = models
+                if settings.ollamaModel == nil { settings.ollamaModel = models.first }
+            }
+        }
     }
 
     private func confirmClearHistory() {

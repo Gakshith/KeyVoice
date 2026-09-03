@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             hotkey: HotkeyMonitor(config: config),
             audio: MicAudioCapture(config: config),
             transcriber: SpeechTranscriberEngine(),   // Apple on-device (macOS 26); Apple-only, no fallback
-            cleaner: ClaudeCleaner(config: config),
+            cleaner: RoutingCleaner(config: config),   // routes to the user's chosen backend, live
             inserter: PasteInserter(config: config),
             targets: AXTargetProvider(),
             config: config

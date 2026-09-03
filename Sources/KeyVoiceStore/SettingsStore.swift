@@ -44,4 +44,25 @@ public final class SettingsStore {
         get { defaults.object(forKey: "needsOnboarding") as? Bool ?? true }
         set { defaults.set(newValue, forKey: "needsOnboarding") }
     }
+
+    // MARK: - Cleanup model
+    // These keys are also read directly (thread-safe) by RoutingCleaner off the main actor.
+
+    /// Which backend polishes transcripts: "off" (raw, most private), "ollama", "cli", "claude".
+    public var cleanupProvider: String {
+        get { defaults.string(forKey: "cleanupProvider") ?? "off" }
+        set { defaults.set(newValue, forKey: "cleanupProvider") }
+    }
+
+    /// The Ollama model name to use when cleanupProvider == "ollama".
+    public var ollamaModel: String? {
+        get { defaults.string(forKey: "ollamaModel") }
+        set { defaults.set(newValue, forKey: "ollamaModel") }
+    }
+
+    /// The installed CLI to use when cleanupProvider == "cli": "claude", "codex", or "gemini".
+    public var cliTool: String {
+        get { defaults.string(forKey: "cliTool") ?? "claude" }
+        set { defaults.set(newValue, forKey: "cliTool") }
+    }
 }
