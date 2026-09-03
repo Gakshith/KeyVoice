@@ -81,6 +81,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Per-app writing style: look up the user's Styles rule for the frontmost app.
         coordinator.styleProvider = { [weak store] bundleId in store?.style(forBundleId: bundleId) }
+        // Translation: the user's chosen target language (nil when off), applied during cleanup.
+        coordinator.languageProvider = { [weak settings] in
+            guard let lang = settings?.targetLanguage, lang != "off", !lang.isEmpty else { return nil }
+            return lang
+        }
 
         self.coordinator = coordinator
         rearm()   // first attempt to arm the hotkey (may fail until permissions are granted)

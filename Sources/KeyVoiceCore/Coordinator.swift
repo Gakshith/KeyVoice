@@ -35,6 +35,10 @@ public final class Coordinator {
     /// Styles rules; the resolved hint rides into the cleaner via `AppContext.styleHint`.
     public var styleProvider: ((String) -> String?)?
 
+    /// Optional target-language lookup (→ language name, or nil). The shell points this at the user's
+    /// translation setting; rides into the cleaner via `AppContext.translateTo`.
+    public var languageProvider: (() -> String?)?
+
     /// Hold duration of the current dictation, captured at commit, used for words-per-minute.
     private var lastHoldDuration: TimeInterval = 0
 
@@ -150,7 +154,9 @@ public final class Coordinator {
             let deadline = config.cleanupDeadline(forCharacters: trimmed.count)
             // Resolve the user's per-app style (on the main actor) and carry it into the cleaner.
             let styleHint = styleProvider?(target.bundleId)
-            let ctx = AppContext(bundleId: target.bundleId, appName: target.appName, styleHint: styleHint)
+            let translateTo = languageProvider?()
+            let ctx = AppContext(bundleId: target.bundleId, appName: target.appName,
+                                 styleHint: styleHint, translateTo: translateTo)
             let cleaned = await withDeadline(deadline) { [cleaner] in
                 await cleaner.clean(trimmed, app: ctx)
             } ?? nil
