@@ -13,7 +13,7 @@ public final class Store {
     /// Builds the on-disk store. Falls back to an in-memory store if the disk container can't be
     /// created, so the app still runs (history just won't persist) rather than crashing.
     public init() {
-        let schema = Schema([TranscriptRecord.self, DictionaryEntry.self])
+        let schema = Schema([TranscriptRecord.self, DictionaryEntry.self, StyleRule.self, Snippet.self])
         if let disk = try? ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema)) {
             container = disk
         } else {
@@ -107,6 +107,53 @@ public final class Store {
 
     public func delete(_ entry: DictionaryEntry) {
         context.delete(entry)
+        try? context.save()
+    }
+
+    // MARK: - Styles
+
+    /// Per-app style rules, newest first.
+    public func styleRules() -> [StyleRule] {
+        (try? context.fetch(FetchDescriptor<StyleRule>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        ))) ?? []
+    }
+
+    /// The style kind for a bundle id, or nil if the user hasn't set one (caller falls back).
+    public func style(forBundleId bundleId: String) -> String? {
+        styleRules().first { $0.appBundleId == bundleId }?.kind
+    }
+
+    public func addStyleRule(appBundleId: String, appName: String, kind: String) {
+        // One rule per app — replace an existing one rather than duplicating.
+        for existing in styleRules() where existing.appBundleId == appBundleId {
+            context.delete(existing)
+        }
+        context.insert(StyleRule(appBundleId: appBundleId, appName: appName, kind: kind))
+        try? context.save()
+    }
+
+    public func delete(_ rule: StyleRule) {
+        context.delete(rule)
+        try? context.save()
+    }
+
+    // MARK: - Snippets
+
+    /// Voice snippets, newest first.
+    public func snippets() -> [Snippet] {
+        (try? context.fetch(FetchDescriptor<Snippet>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        ))) ?? []
+    }
+
+    public func addSnippet(trigger: String, expansion: String) {
+        context.insert(Snippet(trigger: trigger, expansion: expansion))
+        try? context.save()
+    }
+
+    public func delete(_ snippet: Snippet) {
+        context.delete(snippet)
         try? context.save()
     }
 

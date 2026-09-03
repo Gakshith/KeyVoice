@@ -21,6 +21,37 @@ public final class TranscriptRecord {
     }
 }
 
+/// A per-app writing style. When the user dictates into `appBundleId`, cleanup uses `kind` to
+/// match the register (formal/casual/code/clean/raw) — via punctuation & phrasing only.
+@Model
+public final class StyleRule {
+    public var appBundleId: String
+    public var appName: String
+    public var kind: String
+    public var date: Date
+
+    public init(appBundleId: String, appName: String, kind: String, date: Date = Date()) {
+        self.appBundleId = appBundleId
+        self.appName = appName
+        self.kind = kind
+        self.date = date
+    }
+}
+
+/// A voice text-expansion: say `trigger`, get `expansion` pasted. Local only.
+@Model
+public final class Snippet {
+    public var trigger: String
+    public var expansion: String
+    public var date: Date
+
+    public init(trigger: String, expansion: String, date: Date = Date()) {
+        self.trigger = trigger
+        self.expansion = expansion
+        self.date = date
+    }
+}
+
 /// A custom word or replacement the user teaches KeyVoice, so names/acronyms come out right.
 /// `from` empty ⇒ a "known word" (spelling hint only); `from` non-empty ⇒ replace `from` with `to`.
 @Model
