@@ -17,9 +17,45 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
 cp "$BIN" "$APP/Contents/MacOS/KeyVoice"
 cp Packaging/Info.plist "$APP/Contents/Info.plist"
+mkdir -p "$APP/Contents/Resources"
+cp Packaging/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-# Ad-hoc sign so macOS gives the bundle a stable identity for TCC grants (fine for personal use).
-codesign --force --deep --sign - "$APP"
+# --- Code signing -----------------------------------------------------------------------------
+# macOS ties TCC permissions (Input Monitoring, Accessibility) to the app's code-signing identity.
+# A real CERTIFICATE anchors the "designated requirement" to the cert, so the identity — and the
+# permissions you granted — stay stable across rebuilds. AD-HOC signing (`codesign -s -`) anchors it
+# to the executable's CDHash, which changes on every rebuild, so macOS drops the grants each time.
+#
+# Identity resolution (configurable — nothing hardcoded):
+#   1. $KEYVOICE_CODESIGN_IDENTITY, if set (an Apple Development cert, or the self-signed one from
+#      Scripts/setup-signing.sh).
+#   2. otherwise, auto-detect an installed "Apple Development" identity.
+#   3. otherwise, warn loudly and fall back to ad-hoc (grants will reset on every rebuild).
+IDENTITY="${KEYVOICE_CODESIGN_IDENTITY:-}"
+if [ -z "$IDENTITY" ]; then
+  IDENTITY="$(security find-identity -v -p codesigning 2>/dev/null \
+              | grep -o '"Apple Development:[^"]*"' | head -1 | tr -d '"')" || true
+fi
+
+if [ -n "$IDENTITY" ]; then
+  echo "Signing with stable identity: $IDENTITY"
+  codesign --force --sign "$IDENTITY" "$APP"
+else
+  {
+    echo
+    echo "WARNING: no stable code-signing identity found — falling back to AD-HOC signing."
+    echo "         macOS will DROP KeyVoice's Input Monitoring & Accessibility grants on every"
+    echo "         rebuild, so the hotkey won't arm after a rebuild until you re-grant them."
+    echo "         Fix once:  ./Scripts/setup-signing.sh   (then export the identity it prints),"
+    echo "         or set KEYVOICE_CODESIGN_IDENTITY to an Apple Development certificate."
+    echo "         See README.md > \"Code signing\"."
+    echo
+  } >&2
+  codesign --force --sign - "$APP"
+fi
+
+echo "Designated requirement (stable across rebuilds only if certificate-based):"
+codesign -d -r- "$APP" 2>&1 | sed -n 's/^designated => /  /p'
 
 echo "Built $APP"
-echo "Run it:  open $APP     (then grant Input Monitoring + Accessibility + Microphone in System Settings)"
+echo "Run it:  open $APP     (grant Input Monitoring + Accessibility + Microphone on first launch)"

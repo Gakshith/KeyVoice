@@ -5,31 +5,45 @@ import PackageDescription
 // Modules map 1:1 to the plan's components so each can be built and reviewed on its own branch.
 let package = Package(
     name: "KeyVoice",
-    // Deploy target 14 so WhisperKit works as a fallback; macOS 26 APIs (SpeechAnalyzer) are @available-guarded.
-    platforms: [.macOS(.v14)],
+    // Deploy target macOS 26: the only transcription backend (Apple SpeechAnalyzer) requires it, so
+    // advertising an older minimum was a compatibility lie (audit P0 · COMPAT). Require 26 honestly.
+    platforms: [.macOS("26.0")],
     products: [
-        .executable(name: "KeyVoice", targets: ["KeyVoiceApp"])
+        .executable(name: "KeyVoice", targets: ["KeyVoiceApp"]),
+        .library(name: "KeyVoiceDesign", targets: ["KeyVoiceDesign"])
     ],
     targets: [
         // The frozen contract: protocols, Target, events, the Coordinator spine. Everything depends on this.
         .target(name: "KeyVoiceCore"),
+        .target(name: "KeyVoiceDesign"),
 
         // One target per work area — filled in on its own feature branch/worktree.
         .target(name: "KeyVoiceHotkey", dependencies: ["KeyVoiceCore"]),   // branch: hotkey
         .target(name: "KeyVoiceInsert", dependencies: ["KeyVoiceCore"]),   // branch: paste
         .target(name: "KeyVoiceAudio",  dependencies: ["KeyVoiceCore"]),   // branch: speech
         .target(name: "KeyVoiceCleanup", dependencies: ["KeyVoiceCore"]),  // branch: cleanup
+        // Floating Living HUD — Liquid Glass capsule + a SwiftUI Canvas Aurora. No Metal, no
+        // resource bundle (the old .metallib caused a clean-Mac packaging crash — audit P0 · SHIP).
+        .target(name: "KeyVoiceHUD", dependencies: ["KeyVoiceCore", "KeyVoiceDesign"]),
+
+        // MVP product modules.
+        .target(name: "KeyVoiceStore",   dependencies: ["KeyVoiceCore"]),                    // local history + dictionary + settings (SwiftData)
+        .target(name: "KeyVoiceHub",     dependencies: ["KeyVoiceCore", "KeyVoiceStore", "KeyVoiceDesign", "KeyVoiceCleanup"]),   // the Studio window: Dictation / History / … / Settings
+        .target(name: "KeyVoiceOnboarding", dependencies: ["KeyVoiceCore", "KeyVoiceStore", "KeyVoiceDesign"]),// first-run permission walkthrough
 
         // The app shell wires the concrete implementations into the Coordinator.
         .executableTarget(
             name: "KeyVoiceApp",
             dependencies: [
-                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup"
+                "KeyVoiceCore", "KeyVoiceHotkey", "KeyVoiceInsert", "KeyVoiceAudio", "KeyVoiceCleanup",
+                "KeyVoiceHUD", "KeyVoiceStore", "KeyVoiceHub", "KeyVoiceOnboarding"
             ]
         ),
 
         // Pure-logic unit tests (no hardware needed) so the core is verifiable in CI.
-        .testTarget(name: "KeyVoiceCoreTests", dependencies: ["KeyVoiceCore"])
+        .testTarget(name: "KeyVoiceCoreTests", dependencies: ["KeyVoiceCore"]),
+        .testTarget(name: "KeyVoiceHUDTests", dependencies: ["KeyVoiceHUD"]),
+        .testTarget(name: "KeyVoiceAudioTests", dependencies: ["KeyVoiceAudio"])
     ],
     // Language mode 5: this is a UI/system app full of CoreFoundation types that aren't Sendable.
     // Strict 6-mode concurrency here buys warnings, not safety. @MainActor is used where it matters.

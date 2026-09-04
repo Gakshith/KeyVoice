@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import CoreAudio
 import KeyVoiceCore
 
 /// Microphone capture via `AVAudioEngine`; emits raw buffers live and auto-commits past the cap.
@@ -23,8 +24,17 @@ public final class MicAudioCapture: AudioCapturing {
         try ensureMicrophonePermission()
 
         let input = engine.inputNode
+        // Route capture to the user's chosen input device if they picked one (Settings → Microphone).
+        // Any failure falls back to the system default — we never block recording on device routing.
+        if let uid = UserDefaults.standard.string(forKey: "micDeviceID"),
+           let deviceID = Self.audioDeviceID(forUID: uid) {
+            Self.setInputDevice(deviceID, on: engine)
+        }
         // The tap format must match the node's own output format, or `installTap` traps.
         let format = input.outputFormat(forBus: 0)
+        guard format.channelCount > 0, format.sampleRate > 0 else {
+            throw KeyVoiceError.microphoneBusy
+        }
         input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
             self?.onBuffer?(buffer)
         }
@@ -51,6 +61,48 @@ public final class MicAudioCapture: AudioCapturing {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
         running = false
+    }
+
+    // MARK: - Input device selection (CoreAudio)
+
+    /// Resolve a CoreAudio device id from an `AVCaptureDevice.uniqueID` (which, for audio, is the
+    /// device's CoreAudio UID). Returns nil if not found so the caller keeps the system default.
+    private static func audioDeviceID(forUID uid: String) -> AudioDeviceID? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size) == noErr,
+              size > 0 else { return nil }
+        let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+        var ids = [AudioDeviceID](repeating: 0, count: count)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &ids) == noErr
+        else { return nil }
+
+        var uidAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceUID,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        for id in ids {
+            var cfUID: CFString? = nil
+            var uidSize = UInt32(MemoryLayout<CFString?>.size)
+            let status = withUnsafeMutablePointer(to: &cfUID) {
+                AudioObjectGetPropertyData(id, &uidAddr, 0, nil, &uidSize, $0)
+            }
+            if status == noErr, (cfUID as String?) == uid { return id }
+        }
+        return nil
+    }
+
+    /// Point the engine's input (AUHAL) at a specific device. Must run before the engine starts.
+    private static func setInputDevice(_ deviceID: AudioDeviceID, on engine: AVAudioEngine) {
+        guard let audioUnit = engine.inputNode.audioUnit else { return }
+        var dev = deviceID
+        _ = AudioUnitSetProperty(audioUnit,
+                                 kAudioOutputUnitProperty_CurrentDevice,
+                                 kAudioUnitScope_Global, 0,
+                                 &dev, UInt32(MemoryLayout<AudioDeviceID>.size))
     }
 
     // MARK: - Permission

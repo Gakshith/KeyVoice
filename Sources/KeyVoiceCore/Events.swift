@@ -25,5 +25,6 @@ public enum PipelineStatus: Equatable {
     case insertedRaw         // cleanup failed/slow, raw text pasted
     case skippedNoSpeech     // empty/near-empty transcript, nothing pasted
     case abortedTargetLost   // focus moved apps; refused to paste into the wrong window
+    case capturedNoTarget    // no editable field focused; text saved to the scratchpad instead
     case error(String)       // permission / mic / key / asset problem
 }

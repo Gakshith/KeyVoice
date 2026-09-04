@@ -12,8 +12,8 @@ import Speech
 /// `feed` pushes live microphone buffers into it during the hold, and `finishSession` finalizes and
 /// returns the accumulated transcript — so on key-up the text is essentially already there.
 ///
-/// On macOS < 26, or when the transcriber / its assets are unavailable, `beginSession` throws so the
-/// Coordinator falls back to `WhisperKitEngine`.
+/// On macOS < 26, or when the transcriber / its assets are unavailable, `beginSession` throws and the
+/// error surfaces to the menu bar + HUD (Apple-only; there is no secondary engine).
 public final class SpeechTranscriberEngine: Transcriber {
 
     /// Locale we transcribe in. `en-US`; normalized to the framework's supported equivalent at setup.
@@ -24,7 +24,32 @@ public final class SpeechTranscriberEngine: Transcriber {
     /// The pipeline task; its value is the finalized transcript.
     private var runTask: Task<String, Error>?
 
+    /// Live partial transcript, emitted as the user speaks (finalized-so-far + the volatile tail).
+    /// The app shell points this at the on-screen caption. Called off the main actor.
+    public var onPartial: (@Sendable (String) -> Void)?
+
     public init() {}
+
+    /// Ensures the on-device speech model is installed. Safe to call at launch (pre-warm). Returns
+    /// true if recognition is ready to use now. Never throws — logs and returns false on failure.
+    public func ensureAssetsReady() async -> Bool {
+        guard #available(macOS 26, *) else { return false }
+
+        let transcriber = SpeechTranscriber(
+            locale: requestedLocale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: []
+        )
+
+        do {
+            try await Self.ensureAssets(for: transcriber)
+            return true
+        } catch {
+            Log.error("speech asset preflight failed: \(error.localizedDescription)")
+            return false
+        }
+    }
 
     public func beginSession() throws {
         guard #available(macOS 26, *) else {
@@ -75,32 +100,53 @@ public final class SpeechTranscriberEngine: Transcriber {
             throw KeyVoiceError.transcriptionAssetsMissing
         }
 
+        // Idempotent: deterministically end any lingering session before starting a new one, so a
+        // rapid begin→commit→begin can't leave two pipelines fighting over state (audit P0 · CORE).
+        if runTask != nil {
+            rawContinuation?.finish()
+            runTask?.cancel()
+            cleanup()
+        }
+
         let (rawStream, continuation) = AsyncStream.makeStream(of: AVAudioPCMBuffer.self)
         rawContinuation = continuation
         let locale = requestedLocale
-        runTask = Task { try await Self.runPipeline(rawStream: rawStream, locale: locale) }
+        let onPartial = onPartial
+        runTask = Task { try await Self.runPipeline(rawStream: rawStream, locale: locale, onPartial: onPartial) }
     }
 
     /// Owns the whole analyzer lifecycle for one dictation and returns the final transcript.
     @available(macOS 26, *)
     private static func runPipeline(
         rawStream: AsyncStream<AVAudioPCMBuffer>,
-        locale: Locale
+        locale: Locale,
+        onPartial: (@Sendable (String) -> Void)?
     ) async throws -> String {
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
+        // Volatile results give us the live partial transcript for the streaming caption.
+        let transcriber = SpeechTranscriber(
+            locale: locale,
+            transcriptionOptions: [],
+            reportingOptions: [.volatileResults],
+            attributeOptions: []
+        )
 
         try await ensureAssets(for: transcriber)
 
         let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
         let analyzer = SpeechAnalyzer(modules: [transcriber])
 
-        // Collect finalized segments as they arrive.
+        // Collect finalized segments; emit finalized-so-far + the volatile tail for the live caption.
         let resultsTask = Task { () -> String in
-            var transcript = AttributedString()
-            for try await result in transcriber.results where result.isFinal {
-                transcript += result.text
+            var finalized = AttributedString()
+            for try await result in transcriber.results {
+                if result.isFinal {
+                    finalized += result.text
+                    onPartial?(String(finalized.characters))
+                } else {
+                    onPartial?(String((finalized + result.text).characters))
+                }
             }
-            return String(transcript.characters)
+            return String(finalized.characters)
         }
 
         // Bridge raw mic buffers → analyzer input, converting to the analyzer's format as needed.

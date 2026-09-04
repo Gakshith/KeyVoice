@@ -29,20 +29,38 @@ public final class AXTargetProvider: TargetProvider {
     public func currentTarget() -> Target? {
         guard ensureTrusted() else { return nil }
 
-        // Focused element system-wide, then its role.
-        guard let focused = copyFocusedElement() else { return nil }
-        guard let role = copyStringAttribute(focused, kAXRoleAttribute as CFString) else { return nil }
-        guard Self.editableRoles.contains(role) else { return nil }
-
-        // Frontmost app identity.
+        // The dictation destination is the frontmost app. We paste into it with ⌘V, so it's the app,
+        // not a specific AX element, that we ultimately target.
         guard let app = NSWorkspace.shared.frontmostApplication else { return nil }
+
+        // Try to read the focused element + role. Native fields report an editable role (AXTextField,
+        // AXTextArea, …) and we keep that element for the most precise target re-check. But many
+        // web/Electron inputs — Chrome, and Claude's own input among them — don't expose an editable
+        // role (or any focused element) to accessibility, even though ⌘V pastes into them fine. So we
+        // do NOT refuse those: we fall back to a pid-gated target (no element), which still pastes at
+        // the cursor and is still guarded against landing in the wrong app by the pid check.
+        let focused = copyFocusedElement()
+        let role = focused.flatMap { copyStringAttribute($0, kAXRoleAttribute as CFString) }
+        let isKnownEditable = role.map(Self.editableRoles.contains) ?? false
+
+        if !isKnownEditable {
+            Log.info("target: \(app.localizedName ?? "?") focus role '\(role ?? "unknown")' not a known editable field — pid-gated paste")
+        }
 
         return Target(
             pid: app.processIdentifier,
             bundleId: app.bundleIdentifier ?? "",
             appName: app.localizedName ?? "",
-            focusedElement: focused
+            focusedElement: isKnownEditable ? focused : nil
         )
+    }
+
+    public func isSecureFieldFocused() -> Bool {
+        guard ensureTrusted(), let focused = copyFocusedElement() else { return false }
+        let role = copyStringAttribute(focused, kAXRoleAttribute as CFString)
+        let subrole = copyStringAttribute(focused, kAXSubroleAttribute as CFString)
+        // Native secure fields report either the AXSecureTextField role or subrole.
+        return role == "AXSecureTextField" || subrole == (kAXSecureTextFieldSubrole as String)
     }
 
     public func stillValid(_ target: Target) -> Bool {

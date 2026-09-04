@@ -35,8 +35,19 @@ The app will need **Accessibility** (to read the active app and insert text) and
 ## Build / test
 
 ```bash
-# TODO: add once the stack and toolchain are chosen
+swift build && swift test        # compile + core unit tests
+./Scripts/setup-signing.sh       # once: stable signing identity (see below)
+export KEYVOICE_CODESIGN_IDENTITY="KeyVoice Dev Signing"
+./Scripts/bundle.sh              # → build/KeyVoice.app (signed)
 ```
+
+**Signing matters.** macOS ties Input Monitoring + Accessibility grants to the code-signing
+identity. Ad-hoc signing changes identity every rebuild (CDHash-based) so grants are dropped —
+`Scripts/bundle.sh` signs with a stable certificate from `$KEYVOICE_CODESIGN_IDENTITY` (an Apple
+Development cert, or the self-signed one from `Scripts/setup-signing.sh`), and warns + falls back to
+ad-hoc if none. After switching signing, the user must clear KeyVoice's stale Input Monitoring /
+Accessibility entries once (System Settings, or `tccutil reset`). Never reset TCC automatically.
+Full detail in README.md → "Code signing".
 
 ## Conventions
 
